@@ -206,6 +206,7 @@ function render() {
   els.powerButton.classList.toggle('active', state.power);
   els.modeButton.classList.toggle('active', state.mode === 'night');
   els.shadeButton.classList.toggle('active', state.shade);
+  els.shadeButton.classList.toggle('shade-active', state.shade);
   els.shadeButton.textContent = state.shade ? 'Active' : 'Hold';
 
   // Visual feedback: start button shows audio state
@@ -425,10 +426,13 @@ async function createDayNightManEngine(initialState) {
       // Add subtle instability
       const instability = updateInstability();
 
-      // === SHADE GESTURE - darken without muting ===
-      // Make it clearly audible: darker filter move, slightly less space, small level tuck.
-      const shadeMixFactor = shade ? 0.55 : 1.0;
-      const shadeLevelOffset = shade ? -4.5 : 0; // dB
+      // === SHADE GESTURE - dampen like hand over strings ===
+      // Smooth attack/release for musical feel, not clicky
+      // While held: tuck live level, darken filter, reduce wet/delay sends but keep tails
+      const shadeAttack = shade ? 0.12 : 0.25; // smooth transitions
+      const shadeLevelDb = shade ? -9 : 0; // noticeable tuck, not hard kill
+      const shadeFilterFreq = shade ? 0.35 : 1.0; // darken filter
+      const shadeWet = shade ? 0.55 : 1.0; // reduce wet sends, keep tails
 
       if (night) {
         // === NIGHTMAN (Audra-2 inspired) ===
@@ -441,9 +445,9 @@ async function createDayNightManEngine(initialState) {
 
         filter.type = 'lowpass';
         const nightBaseFilter = mapRange(haze, 200, 1800);
-        const nightShadeFilter = shade ? nightBaseFilter * 0.45 : nightBaseFilter;
-        filter.frequency.setTargetAtTime(clamp(nightShadeFilter, 120, 1800), ctx.currentTime, 0.05);
-        filter.Q.setTargetAtTime(mapRange(space, 0.5, 6) * (shade ? 0.85 : 1), ctx.currentTime, 0.05);
+        const nightShadeFilter = nightBaseFilter * shadeFilterFreq;
+        filter.frequency.setTargetAtTime(clamp(nightShadeFilter, 120, 1800), ctx.currentTime, shadeAttack);
+        filter.Q.setTargetAtTime(mapRange(space, 0.5, 6) * (shade ? 0.7 : 1), ctx.currentTime, shadeAttack);
 
         // Night LFO - slow, ambient
         const nightPulse = mapRange(pulse, 0.02, 0.3);
@@ -451,23 +455,23 @@ async function createDayNightManEngine(initialState) {
         lfoDepth.gain.setTargetAtTime(mapRange(drift, 0.1, 0.35), ctx.currentTime, 0.05);
         filterMod.gain.setTargetAtTime(drift * 180, ctx.currentTime, 0.05);
 
-        // Night delay/reverb - wider
-        const nightSpace = mapRange(space, 0.15, 0.7) * shadeMixFactor;
-        delayWet.gain.setTargetAtTime(nightSpace * 0.7, ctx.currentTime, 0.05);
-        dryGain.gain.setTargetAtTime(1 - nightSpace * 0.5, ctx.currentTime, 0.05);
-        delay.delayTime.setTargetAtTime(mapRange(space, 0.25, 0.9), ctx.currentTime, 0.05);
-        delayFeedback.gain.setTargetAtTime(mapRange(space, 0.15, 0.55) * (shade ? 0.8 : 1), ctx.currentTime, 0.05);
+        // Night delay/reverb - wider, reduce wet on shade
+        const nightSpace = mapRange(space, 0.15, 0.7) * shadeWet;
+        delayWet.gain.setTargetAtTime(nightSpace * 0.7, ctx.currentTime, shadeAttack);
+        dryGain.gain.setTargetAtTime(1 - nightSpace * 0.5, ctx.currentTime, shadeAttack);
+        delay.delayTime.setTargetAtTime(mapRange(space, 0.25, 0.9), ctx.currentTime, shadeAttack);
+        delayFeedback.gain.setTargetAtTime(mapRange(space, 0.15, 0.55) * (shade ? 0.65 : 1), ctx.currentTime, shadeAttack);
 
-        // Subtle reverb for night
-        reverbWet.gain.setTargetAtTime(space * 0.12 * shadeMixFactor, ctx.currentTime, 0.05);
+        // Subtle reverb for night - reduce but keep tails
+        reverbWet.gain.setTargetAtTime(space * 0.12 * shadeWet, ctx.currentTime, shadeAttack);
 
         // Night drive - soft
-        shaper.curve = makeDriveCurve((1 + haze * 0.6) * 10 * (shade ? 0.9 : 1));
+        shaper.curve = makeDriveCurve((1 + haze * 0.6) * 10 * (shade ? 0.75 : 1));
 
         // Disable day oscs
-        dayOscGains.forEach(g => g.gain.setTargetAtTime(0, ctx.currentTime, 0.1));
-        noiseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-        subGain.gain.setTargetAtTime(0.3 + haze * 0.15, ctx.currentTime, 0.05);
+        dayOscGains.forEach(g => g.gain.setTargetAtTime(0, ctx.currentTime, shadeAttack));
+        noiseGain.gain.setTargetAtTime(0, ctx.currentTime, shadeAttack);
+        subGain.gain.setTargetAtTime((0.3 + haze * 0.15) * (shade ? 0.8 : 1), ctx.currentTime, shadeAttack);
 
       } else {
         // === DAYMAN (Lyra-8 inspired) ===
@@ -489,49 +493,48 @@ async function createDayNightManEngine(initialState) {
         dayOscs[2].frequency.setTargetAtTime(baseHz * 1.007, ctx.currentTime, 0.05);
         dayOscs[3].frequency.setTargetAtTime(baseHz * 1.012, ctx.currentTime, 0.05);
 
-        // Subtle noise layer for air
-        noiseGain.gain.setTargetAtTime(bite * 0.015 * (shade ? 0.7 : 1), ctx.currentTime, 0.05);
-        noiseFilter.frequency.setTargetAtTime(2000 + bite * 2000, ctx.currentTime, 0.05);
+        // Subtle noise layer for air - reduce while shaded
+        noiseGain.gain.setTargetAtTime(bite * 0.015 * (shade ? 0.5 : 1), ctx.currentTime, shadeAttack);
+        noiseFilter.frequency.setTargetAtTime(2000 + bite * 2000, ctx.currentTime, shadeAttack);
 
-        // Filter - airy, not harsh
+        // Filter - airy, not harsh, darken on shade
         filter.type = 'bandpass';
         const dayBaseFilter = mapRange(bite, 400, 2500);
-        const dayShadeFilter = shade ? dayBaseFilter * 0.5 : dayBaseFilter;
-        filter.frequency.setTargetAtTime(clamp(dayShadeFilter, 180, 2500), ctx.currentTime, 0.05);
-        filter.Q.setTargetAtTime((0.8 + heat * 1.5) * (shade ? 0.9 : 1), ctx.currentTime, 0.05);
+        const dayShadeFilter = dayBaseFilter * shadeFilterFreq;
+        filter.frequency.setTargetAtTime(clamp(dayShadeFilter, 180, 2500), ctx.currentTime, shadeAttack);
+        filter.Q.setTargetAtTime((0.8 + heat * 1.5) * (shade ? 0.85 : 1), ctx.currentTime, shadeAttack);
 
         // Pulse controls LFO rate
         const dayPulse = mapRange(pulse, 0.08, 1.5);
-        lfo.frequency.setTargetAtTime(dayPulse, ctx.currentTime, 0.05);
-        lfoDepth.gain.setTargetAtTime(0.15 + edge * 0.35, ctx.currentTime, 0.05);
-        filterMod.gain.setTargetAtTime(edge * 60 + drift * 30, ctx.currentTime, 0.05);
+        lfo.frequency.setTargetAtTime(dayPulse, ctx.currentTime, shadeAttack);
+        lfoDepth.gain.setTargetAtTime(0.15 + edge * 0.35, ctx.currentTime, shadeAttack);
+        filterMod.gain.setTargetAtTime(edge * 60 + drift * 30, ctx.currentTime, shadeAttack);
 
-        // Day delay - interacts with tone
-        const daySpace = mapRange(space, 0.05, 0.4) * shadeMixFactor;
-        delayWet.gain.setTargetAtTime(daySpace * 0.5, ctx.currentTime, 0.05);
-        dryGain.gain.setTargetAtTime(1 - daySpace * 0.3, ctx.currentTime, 0.05);
-        delay.delayTime.setTargetAtTime(mapRange(edge, 0.08, 0.25), ctx.currentTime, 0.05);
-        delayFeedback.gain.setTargetAtTime(mapRange(edge, 0.08, 0.35) * (shade ? 0.78 : 1), ctx.currentTime, 0.05);
+        // Day delay - interacts with tone, reduce wet on shade
+        const daySpace = mapRange(space, 0.05, 0.4) * shadeWet;
+        delayWet.gain.setTargetAtTime(daySpace * 0.5, ctx.currentTime, shadeAttack);
+        dryGain.gain.setTargetAtTime(1 - daySpace * 0.3, ctx.currentTime, shadeAttack);
+        delay.delayTime.setTargetAtTime(mapRange(edge, 0.08, 0.25), ctx.currentTime, shadeAttack);
+        delayFeedback.gain.setTargetAtTime(mapRange(edge, 0.08, 0.35) * (shade ? 0.6 : 1), ctx.currentTime, shadeAttack);
 
-        // Subtle reverb for day
-        reverbWet.gain.setTargetAtTime(space * 0.06 * shadeMixFactor, ctx.currentTime, 0.05);
+        // Subtle reverb for day - reduce but keep tails
+        reverbWet.gain.setTargetAtTime(space * 0.06 * shadeWet, ctx.currentTime, shadeAttack);
 
-        // Day drive - warm, not harsh
+        // Day drive - warm, not harsh, reduce on shade
         const dayDrive = 1 + heat * 1.8;
-        shaper.curve = makeDriveCurve(dayDrive * 8 * (shade ? 0.9 : 1));
+        shaper.curve = makeDriveCurve(dayDrive * 8 * (shade ? 0.7 : 1));
 
         // Sub in day
-        subGain.gain.setTargetAtTime(0.1 + bite * 0.08, ctx.currentTime, 0.05);
-        subOsc.frequency.setTargetAtTime(baseHz * 0.5, ctx.currentTime, 0.05);
+        subGain.gain.setTargetAtTime((0.1 + bite * 0.08) * (shade ? 0.75 : 1), ctx.currentTime, shadeAttack);
+        subOsc.frequency.setTargetAtTime(baseHz * 0.5, ctx.currentTime, shadeAttack);
 
         // Disable night oscs
-        nightGain1.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
-        nightGain2.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+        nightGain1.gain.setTargetAtTime(0, ctx.currentTime, shadeAttack);
+        nightGain2.gain.setTargetAtTime(0, ctx.currentTime, shadeAttack);
       }
 
-      // Output with shade
-      const outputDb = next.output + shadeLevelOffset;
-      outputGain.gain.setTargetAtTime(dbToGain(outputDb) * power * 0.25, ctx.currentTime, 0.05);
+      // Output with shade - smooth level tuck
+      outputGain.gain.setTargetAtTime(dbToGain(next.output + shadeLevelDb) * power * 0.25, ctx.currentTime, shadeAttack);
     }
   };
 
