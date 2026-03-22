@@ -11,9 +11,9 @@
     <main class="app-shell">
       <header class="hero">
         <p class="eyebrow">DayNightMan</p>
-        <h1>modular morph</h1>
+        <h1>boutique morph synth</h1>
         <p class="subcopy">
-          A tactile browser instrument. Drag knobs to shape sound.
+          A believable 2.5D browser instrument with a physical day↔night body shift.
         </p>
       </header>
 
@@ -30,256 +30,298 @@
         <p id="statusText" class="status">Audio stopped</p>
       </section>
 
-      <section class="card controls-grid">
-        <div class="panel-plate"></div>
+      <section class="card synth-object">
+        <div class="desk-shadow" aria-hidden="true"></div>
+        <div class="chassis-shell">
+          <div class="rear-riser" aria-hidden="true"></div>
+          <div class="faceplate-frame">
+            <div class="faceplate-surface panel-plate"></div>
 
-        <div class="knob-column">
-          <div class="knob-row">
-            <div class="knob-group" data-param="bite">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="bite" aria-label="Bite knob">
-                <defs>
-                  <radialGradient id="knob-core" cx="32%" cy="28%" r="72%">
-                    <stop offset="0%" stop-color="#8a887d"/>
-                    <stop offset="18%" stop-color="#5d5b54"/>
-                    <stop offset="54%" stop-color="#2f2d2a"/>
-                    <stop offset="100%" stop-color="#11110f"/>
-                  </radialGradient>
-                  <linearGradient id="knob-rim" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#949086"/>
-                    <stop offset="26%" stop-color="#2a2925"/>
-                    <stop offset="72%" stop-color="#050505"/>
-                    <stop offset="100%" stop-color="#706b61"/>
-                  </linearGradient>
-                </defs>
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">BITE</text>
-              </svg>
-              <span class="knob-value" id="biteValue">62%</span>
+            <div class="branding-strip" aria-hidden="true">
+              <span>DAY</span>
+              <span>↔</span>
+              <span>NIGHT</span>
             </div>
-            <div class="knob-group" data-param="heat">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="heat" aria-label="Heat knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">HEAT</text>
-              </svg>
-              <span class="knob-value" id="heatValue">58%</span>
-            </div>
-            <div class="knob-group" data-param="edge">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="edge" aria-label="Edge knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">EDGE</text>
-              </svg>
-              <span class="knob-value" id="edgeValue">45%</span>
-            </div>
-          </div>
-          <div class="knob-row">
-            <div class="knob-group" data-param="pulse">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="pulse" aria-label="Pulse knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">PULSE</text>
-              </svg>
-              <span class="knob-value" id="pulseValue">40%</span>
-            </div>
-            <div class="knob-group" data-param="haze">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="haze" aria-label="Haze knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">HAZE</text>
-              </svg>
-              <span class="knob-value" id="hazeValue">48%</span>
-            </div>
-            <div class="knob-group" data-param="drift">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="drift" aria-label="Drift knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">DRIFT</text>
-              </svg>
-              <span class="knob-value" id="driftValue">36%</span>
-            </div>
-          </div>
-          <div class="knob-row">
-            <div class="knob-group" data-param="space">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="space" aria-label="Space knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">SPACE</text>
-              </svg>
-              <span class="knob-value" id="spaceValue">28%</span>
-            </div>
-            <div class="knob-group" data-param="output">
-              <svg class="knob" viewBox="0 0 80 80" data-knob="output" aria-label="Output knob">
-                <circle cx="40" cy="40" r="37" class="knob-rim" />
-                <circle cx="40" cy="40" r="29" class="knob-core" />
-                <circle cx="40" cy="40" r="22" class="knob-cap" />
-                <g class="knob-ticks">
-                  <line x1="40" y1="7" x2="40" y2="12" />
-                  <line x1="57" y1="12" x2="55" y2="16" />
-                  <line x1="68" y1="24" x2="64" y2="27" />
-                  <line x1="73" y1="40" x2="68" y2="40" />
-                  <line x1="68" y1="56" x2="64" y2="53" />
-                  <line x1="57" y1="68" x2="55" y2="64" />
-                  <line x1="40" y1="73" x2="40" y2="68" />
-                  <line x1="23" y1="68" x2="25" y2="64" />
-                  <line x1="12" y1="56" x2="16" y2="53" />
-                  <line x1="7" y1="40" x2="12" y2="40" />
-                  <line x1="12" y1="24" x2="16" y2="27" />
-                  <line x1="23" y1="12" x2="25" y2="16" />
-                </g>
-                <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
-                <text x="40" y="69" text-anchor="middle">OUT</text>
-              </svg>
-              <span class="knob-value" id="outputValue">-9dB</span>
-            </div>
-          </div>
-        </div>
 
-        <div class="morph-column">
-          <div class="morph-group">
-            <div class="morph-meta">
-              <span class="morph-title">Morph Spine</span>
-              <span id="morphMode" class="morph-state">DAY</span>
-            </div>
-            <button id="morphTrack" class="morph-track" type="button" aria-label="Day to Night morph control">
-              <div class="morph-scale">
-                <span>DAY</span>
-                <span>HYBRID</span>
-                <span>NIGHT</span>
-              </div>
-              <div class="morph-slot">
-                <div class="morph-fill" id="morphFill"></div>
-                <div class="morph-thumb" id="morphThumb">
-                  <span class="morph-thumb-core"></span>
+            <div class="controls-grid">
+              <section class="control-well tone-well" aria-label="Tone controls">
+                <div class="well-header">
+                  <span>Tone well</span>
+                  <span>front bus</span>
                 </div>
-              </div>
-            </button>
-          </div>
+                <div class="knob-row">
+                  <div class="knob-group" data-param="bite">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="bite" aria-label="Bite knob">
+                      <defs>
+                        <radialGradient id="knob-core" cx="32%" cy="28%" r="72%">
+                          <stop offset="0%" stop-color="#8a887d"/>
+                          <stop offset="18%" stop-color="#5d5b54"/>
+                          <stop offset="54%" stop-color="#2f2d2a"/>
+                          <stop offset="100%" stop-color="#11110f"/>
+                        </radialGradient>
+                        <linearGradient id="knob-rim" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stop-color="#949086"/>
+                          <stop offset="26%" stop-color="#2a2925"/>
+                          <stop offset="72%" stop-color="#050505"/>
+                          <stop offset="100%" stop-color="#706b61"/>
+                        </linearGradient>
+                      </defs>
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">BITE</text>
+                    </svg>
+                    <span class="knob-value" id="biteValue">62%</span>
+                  </div>
+                  <div class="knob-group" data-param="heat">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="heat" aria-label="Heat knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">HEAT</text>
+                    </svg>
+                    <span class="knob-value" id="heatValue">58%</span>
+                  </div>
+                  <div class="knob-group" data-param="edge">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="edge" aria-label="Edge knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">EDGE</text>
+                    </svg>
+                    <span class="knob-value" id="edgeValue">45%</span>
+                  </div>
+                </div>
+              </section>
 
-          <div class="pitch-group">
-            <label for="pitchWheel">Pitch wheel</label>
-            <div class="pitch-wheel-wrap">
-              <div class="pitch-wheel-rim"></div>
-              <button class="pitch-wheel" id="pitchWheel" type="button" aria-label="Pitch wheel">
-                <div class="pitch-wheel-lathe"></div>
-                <div class="pitch-wheel-marker"></div>
-                <div class="pitch-wheel-inner"></div>
-              </button>
+              <section class="control-well texture-well" aria-label="Texture controls">
+                <div class="well-header">
+                  <span>Texture well</span>
+                  <span>shadow bus</span>
+                </div>
+                <div class="knob-row">
+                  <div class="knob-group" data-param="pulse">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="pulse" aria-label="Pulse knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">PULSE</text>
+                    </svg>
+                    <span class="knob-value" id="pulseValue">40%</span>
+                  </div>
+                  <div class="knob-group" data-param="haze">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="haze" aria-label="Haze knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">HAZE</text>
+                    </svg>
+                    <span class="knob-value" id="hazeValue">48%</span>
+                  </div>
+                  <div class="knob-group" data-param="drift">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="drift" aria-label="Drift knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">DRIFT</text>
+                    </svg>
+                    <span class="knob-value" id="driftValue">36%</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="hero-bay" aria-label="Pitch and morph controls">
+                <div class="pitch-group">
+                  <div class="hero-meta">
+                    <label for="pitchWheel">Pitch trackball</label>
+                    <span class="hero-caption">Embedded into the center bay</span>
+                  </div>
+                  <div class="trackball-pocket">
+                    <div class="trackball-gimbal" aria-hidden="true"></div>
+                    <button class="pitch-wheel" id="pitchWheel" type="button" aria-label="Pitch trackball">
+                      <div class="pitch-wheel-glass"></div>
+                      <div class="pitch-wheel-marker"></div>
+                      <div class="pitch-wheel-inner"></div>
+                    </button>
+                  </div>
+                  <span class="pitch-value" id="pitchValue">0</span>
+                </div>
+
+                <div class="morph-group">
+                  <div class="morph-meta">
+                    <span class="morph-title">Physical morph</span>
+                    <span id="morphMode" class="morph-state">DAY</span>
+                  </div>
+                  <button id="morphTrack" class="morph-track" type="button" aria-label="Day to Night morph control">
+                    <div class="morph-scale">
+                      <span>DAY</span>
+                      <span>TWILIGHT</span>
+                      <span>NIGHT</span>
+                    </div>
+                    <div class="morph-slot">
+                      <div class="morph-fill" id="morphFill"></div>
+                      <div class="morph-thumb" id="morphThumb">
+                        <span class="morph-thumb-core"></span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </section>
+
+              <section class="control-well space-well" aria-label="Space and output controls">
+                <div class="well-header">
+                  <span>Space well</span>
+                  <span>room bus</span>
+                </div>
+                <div class="lower-controls">
+                  <div class="knob-group" data-param="space">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="space" aria-label="Space knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">SPACE</text>
+                    </svg>
+                    <span class="knob-value" id="spaceValue">28%</span>
+                  </div>
+
+                  <button id="kickButton" class="kick-trigger" type="button" aria-label="Kick trigger">
+                    <span class="kick-trigger-ring"></span>
+                    <span class="kick-trigger-core"></span>
+                    <span class="kick-trigger-label">KICK</span>
+                  </button>
+
+                  <div class="knob-group" data-param="output">
+                    <svg class="knob" viewBox="0 0 80 80" data-knob="output" aria-label="Output knob">
+                      <circle cx="40" cy="40" r="37" class="knob-rim" />
+                      <circle cx="40" cy="40" r="29" class="knob-core" />
+                      <circle cx="40" cy="40" r="22" class="knob-cap" />
+                      <g class="knob-ticks">
+                        <line x1="40" y1="7" x2="40" y2="12" />
+                        <line x1="57" y1="12" x2="55" y2="16" />
+                        <line x1="68" y1="24" x2="64" y2="27" />
+                        <line x1="73" y1="40" x2="68" y2="40" />
+                        <line x1="68" y1="56" x2="64" y2="53" />
+                        <line x1="57" y1="68" x2="55" y2="64" />
+                        <line x1="40" y1="73" x2="40" y2="68" />
+                        <line x1="23" y1="68" x2="25" y2="64" />
+                        <line x1="12" y1="56" x2="16" y2="53" />
+                        <line x1="7" y1="40" x2="12" y2="40" />
+                        <line x1="12" y1="24" x2="16" y2="27" />
+                        <line x1="23" y1="12" x2="25" y2="16" />
+                      </g>
+                      <line class="knob-line" x1="40" y1="40" x2="40" y2="12" />
+                      <text x="40" y="69" text-anchor="middle">OUT</text>
+                    </svg>
+                    <span class="knob-value" id="outputValue">-9dB</span>
+                  </div>
+                </div>
+              </section>
             </div>
-            <span class="pitch-value" id="pitchValue">0</span>
           </div>
         </div>
       </section>
@@ -289,7 +331,7 @@
       </section>
 
       <section class="card note-card">
-        <p>Drag knobs to shape. Pull the right spine to morph light, texture, and sound together.</p>
+        <p>Drag the wells, spin the embedded trackball, and fire the center kick into the room bus only.</p>
       </section>
     </main>
 

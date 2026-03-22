@@ -25,6 +25,8 @@ let engine = null;
 let audioInitialized = false;
 let audioInitPromise = null;
 let boundVisibilityRecovery = false;
+let eventsBound = false;
+let kickFlashTimeout = null;
 
 const params = ['bite', 'heat', 'edge', 'pulse', 'haze', 'drift', 'space', 'output'];
 const valueRanges = {
@@ -49,7 +51,8 @@ const els = {
   morphFill: document.getElementById('morphFill'),
   morphMode: document.getElementById('morphMode'),
   pitchWheel: document.getElementById('pitchWheel'),
-  pitchValue: document.getElementById('pitchValue')
+  pitchValue: document.getElementById('pitchValue'),
+  kickButton: document.getElementById('kickButton')
 };
 
 const inputSensitivity = {
@@ -144,6 +147,9 @@ function updateKnobLabel(param, value) {
 }
 
 function bindEvents() {
+  if (eventsBound) return;
+  eventsBound = true;
+
   const startHandler = async (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -154,7 +160,7 @@ function bindEvents() {
         await initAudioFromGesture();
       } catch (error) {
         console.error('Audio start failed', error);
-        els.statusText.textContent = `Start failed • tap again`;
+        els.statusText.textContent = 'Start failed • tap again';
       }
       return;
     }
@@ -201,6 +207,7 @@ function bindEvents() {
       state.preset = 'Custom';
       updateKnobVisual(param, nextValue);
       updateKnobLabel(param, nextValue);
+      renderStatus();
     });
 
     const finishKnob = async (event) => {
@@ -252,7 +259,6 @@ function bindEvents() {
     pointerState.pitch = {
       pointerId: event.pointerId,
       inputType: event.pointerType || 'mouse',
-      rect,
       centerX: rect.left + rect.width / 2,
       centerY: rect.top + rect.height / 2,
       startAngle: getAngle(rect.left + rect.width / 2, rect.top + rect.height / 2, event.clientX, event.clientY),
@@ -277,6 +283,7 @@ function bindEvents() {
     state.pitch = clamp(active.startValue + semitoneDelta, -24, 24);
     state.preset = 'Custom';
     updatePitchUI();
+    renderStatus();
   });
 
   const finishPitch = async (event) => {
@@ -289,7 +296,43 @@ function bindEvents() {
   els.pitchWheel.addEventListener('pointerup', finishPitch);
   els.pitchWheel.addEventListener('pointercancel', finishPitch);
   els.pitchWheel.addEventListener('lostpointercapture', finishPitch);
+
+  const kickHandler = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    triggerHaptic('medium');
+
+    if (!audioInitialized) {
+      try {
+        await initAudioFromGesture();
+      } catch (error) {
+        console.error('Kick start failed', error);
+        els.statusText.textContent = 'Start failed • tap again';
+        return;
+      }
+    }
+
+    const running = await recoverAudioContext('kick');
+    if (!running || !engine) {
+      render();
+      return;
+    }
+
+    if (!state.power) {
+      state.power = true;
+      engine.update(state);
+      saveState();
+      render();
+    }
+
+    engine.triggerKick(state);
+    flashKickButton();
+    renderStatus('Kick fired');
+  };
+
+  els.kickButton.addEventListener('click', kickHandler, { passive: false });
 }
+
 
 async function initAudioFromGesture() {
   if (audioInitPromise) return audioInitPromise;
@@ -382,7 +425,7 @@ async function updateEngineFromGesture() {
 
 function setMorphFromPointer(event) {
   const rect = els.morphTrack.getBoundingClientRect();
-  const horizontal = window.matchMedia('(max-width: 520px)').matches;
+  const horizontal = window.matchMedia('(max-width: 560px)').matches;
 
   let percent;
   if (horizontal) {
@@ -398,15 +441,15 @@ function setMorphFromPointer(event) {
 
 function updateMorphUI() {
   const morph = state.morph;
-  const horizontal = window.matchMedia('(max-width: 520px)').matches;
+  const horizontal = window.matchMedia('(max-width: 560px)').matches;
   const slot = els.morphTrack.querySelector('.morph-slot');
   const thumb = els.morphThumb;
   const fill = els.morphFill;
 
   const slotRect = slot.getBoundingClientRect();
-  const thumbSize = horizontal ? thumb.offsetWidth || 46 : thumb.offsetHeight || 46;
-  const travel = Math.max((horizontal ? slotRect.width : slotRect.height) - thumbSize - 8, 0);
-  const offset = 4 + morph * travel;
+  const thumbSize = horizontal ? thumb.offsetWidth || 50 : thumb.offsetHeight || 50;
+  const travel = Math.max((horizontal ? slotRect.width : slotRect.height) - thumbSize - 10, 0);
+  const offset = 5 + morph * travel;
 
   if (horizontal) {
     thumb.style.left = `${offset}px`;
@@ -443,14 +486,14 @@ function updateMorphUI() {
   setCssVar('--panel-hi-g', panelHi[1]);
   setCssVar('--panel-hi-b', panelHi[2]);
 
-  const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'HYBRID';
+  const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'TWILIGHT';
   els.morphMode.textContent = modeName;
   renderStatus();
 }
 
 function updatePitchUI() {
   const pitch = state.pitch;
-  els.pitchValue.textContent = pitch === 0 ? '0' : pitch > 0 ? `+${pitch}` : `${pitch}`;
+  els.pitchValue.textContent = pitch === 0 ? '0 st' : pitch > 0 ? `+${pitch} st` : `${pitch} st`;
 
   const rotation = (pitch / 24) * 140;
   els.pitchWheel.style.transform = `rotate(${rotation}deg)`;
@@ -471,7 +514,12 @@ function render() {
   renderPresetButtons();
 }
 
-function renderStatus() {
+function renderStatus(overrideText = '') {
+  if (overrideText) {
+    els.statusText.textContent = overrideText;
+    return;
+  }
+
   if (!audioInitialized || !engine) {
     els.statusText.textContent = 'Tap start to arm audio';
     return;
@@ -487,8 +535,8 @@ function renderStatus() {
     return;
   }
 
-  const modeName = state.morph < 0.22 ? 'Day' : state.morph > 0.78 ? 'Night' : 'Hybrid';
-  els.statusText.textContent = `${modeName} morph • ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
+  const modeName = state.morph < 0.22 ? 'Day chassis' : state.morph > 0.78 ? 'Night chassis' : 'Twilight morph';
+  els.statusText.textContent = `${modeName} • pitch ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
 }
 
 function renderPresetButtons() {
@@ -572,6 +620,14 @@ async function createDayNightManEngine(initialState) {
   revDly3.delayTime.value = 0.163;
   revFdbk.gain.value = 0.22;
 
+  const kickFilter = context.createBiquadFilter();
+  kickFilter.type = 'lowpass';
+  kickFilter.frequency.value = 140;
+  const kickDrive = context.createWaveShaper();
+  kickDrive.curve = makeDriveCurve(10);
+  const kickSend = context.createGain();
+  kickSend.gain.value = 0;
+
   const outputGain = context.createGain();
   const compressor = context.createDynamicsCompressor();
   const lfo = context.createOscillator();
@@ -596,6 +652,12 @@ async function createDayNightManEngine(initialState) {
   shaper.connect(revDly1).connect(reverbWet);
   shaper.connect(revDly2).connect(reverbWet);
   shaper.connect(revDly3).connect(reverbWet);
+
+  kickFilter.connect(kickDrive).connect(kickSend);
+  kickSend.connect(revDly1);
+  kickSend.connect(revDly2);
+  kickSend.connect(revDly3);
+
   revDly1.connect(revFdbk).connect(revDly2);
   revDly2.connect(revFdbk).connect(revDly3);
   revDly3.connect(revFdbk).connect(revDly1);
@@ -684,6 +746,9 @@ async function createDayNightManEngine(initialState) {
       delayFeedback.gain.setTargetAtTime(0.1 + space * 0.44 + morph * 0.08, context.currentTime, 0.05);
       delayFilter.frequency.setTargetAtTime(2200 + dayWeight * 1200 + nightWeight * 400, context.currentTime, 0.05);
       reverbWet.gain.setTargetAtTime(spaceBlend * (0.05 + 0.06 * nightWeight), context.currentTime, 0.05);
+      kickSend.gain.setTargetAtTime(power * (0.12 + space * 0.24 + nightWeight * 0.08), context.currentTime, 0.03);
+      kickFilter.frequency.setTargetAtTime(110 + space * 190 + nightWeight * 40, context.currentTime, 0.04);
+      revFdbk.gain.setTargetAtTime(0.18 + space * 0.2 + morph * 0.06, context.currentTime, 0.05);
 
       const drive = (1.2 + heat * 2.3) * dayWeight + (1 + haze * 0.9 + drift * 0.2) * nightWeight;
       shaper.curve = makeDriveCurve(drive * 7.5);
@@ -692,11 +757,58 @@ async function createDayNightManEngine(initialState) {
       subGain.gain.setTargetAtTime((0.09 + bite * 0.08) * dayWeight + (0.16 + haze * 0.24) * nightWeight, context.currentTime, 0.05);
 
       outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.25, context.currentTime, 0.05);
+    },
+    triggerKick(next) {
+      const now = context.currentTime;
+      const space = clamp((next.space ?? 0) / 100, 0, 1);
+      const morph = clamp(next.morph ?? 0, 0, 1);
+      const output = dbToGain(next.output ?? -9) * (next.power ? 1 : 0);
+      const baseHz = 58 - morph * 8;
+      const bodyHz = 118 - morph * 18;
+      const kickLevel = output * (0.5 + space * 0.6);
+
+      const osc = context.createOscillator();
+      osc.type = 'sine';
+      const body = context.createOscillator();
+      body.type = morph > 0.55 ? 'triangle' : 'sine';
+      const amp = context.createGain();
+      const bodyGain = context.createGain();
+
+      osc.connect(amp).connect(kickFilter);
+      body.connect(bodyGain).connect(kickFilter);
+
+      amp.gain.setValueAtTime(0.0001, now);
+      amp.gain.exponentialRampToValueAtTime(kickLevel, now + 0.004);
+      amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.34 + space * 0.3);
+
+      bodyGain.gain.setValueAtTime(0.0001, now);
+      bodyGain.gain.exponentialRampToValueAtTime(kickLevel * 0.35, now + 0.008);
+      bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18 + space * 0.1);
+
+      osc.frequency.setValueAtTime(baseHz * 2.4, now);
+      osc.frequency.exponentialRampToValueAtTime(baseHz, now + 0.07);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(baseHz * 0.82, 32), now + 0.24);
+
+      body.frequency.setValueAtTime(bodyHz, now);
+      body.frequency.exponentialRampToValueAtTime(Math.max(bodyHz * 0.72, 48), now + 0.16);
+
+      osc.start(now);
+      body.start(now);
+      osc.stop(now + 0.8 + space * 0.35);
+      body.stop(now + 0.5 + space * 0.2);
     }
   };
 
   api.update(initialState);
   return api;
+}
+
+function flashKickButton() {
+  els.kickButton.classList.add('fired');
+  clearTimeout(kickFlashTimeout);
+  kickFlashTimeout = window.setTimeout(() => {
+    els.kickButton.classList.remove('fired');
+  }, 160);
 }
 
 function mixColor(a, b, t) {
