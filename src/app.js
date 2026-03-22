@@ -52,7 +52,8 @@ const els = {
   morphMode: document.getElementById('morphMode'),
   pitchWheel: document.getElementById('pitchWheel'),
   pitchValue: document.getElementById('pitchValue'),
-  kickButton: document.getElementById('kickButton')
+  kickButton: document.getElementById('kickButton'),
+  stillChips: Array.from(document.querySelectorAll('[data-scene-target]'))
 };
 
 const inputSensitivity = {
@@ -331,6 +332,16 @@ function bindEvents() {
   };
 
   els.kickButton.addEventListener('click', kickHandler, { passive: false });
+
+  els.stillChips.forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      const target = clamp(Number(chip.dataset.sceneTarget || 0), 0, 1);
+      state.morph = target;
+      state.preset = 'Custom';
+      updateMorphUI();
+      await updateEngineFromGesture();
+    });
+  });
 }
 
 
@@ -486,9 +497,27 @@ function updateMorphUI() {
   setCssVar('--panel-hi-g', panelHi[1]);
   setCssVar('--panel-hi-b', panelHi[2]);
 
+  const dayOpacity = clamp(1 - morph * 1.6, 0, 1);
+  const twilightOpacity = clamp(1 - Math.abs(morph - 0.5) * 2.6, 0, 1);
+  const nightOpacity = clamp((morph - 0.35) / 0.65, 0, 1);
+  setCssVar('--scene-day-opacity', dayOpacity.toFixed(4));
+  setCssVar('--scene-twilight-opacity', twilightOpacity.toFixed(4));
+  setCssVar('--scene-night-opacity', nightOpacity.toFixed(4));
+
   const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'TWILIGHT';
   els.morphMode.textContent = modeName;
+  syncStillChips(morph);
   renderStatus();
+}
+
+function syncStillChips(morph) {
+  let activeIndex = 1;
+  if (morph < 0.22) activeIndex = 0;
+  else if (morph > 0.78) activeIndex = 2;
+
+  els.stillChips.forEach((chip, index) => {
+    chip.classList.toggle('active', index === activeIndex);
+  });
 }
 
 function updatePitchUI() {
