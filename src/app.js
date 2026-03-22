@@ -10,6 +10,7 @@ const defaults = {
   drift: 36,
   space: 28,
   output: -9,
+  shade: false,
   preset: 'Prototype Default'
 };
 
@@ -28,6 +29,10 @@ let boundVisibilityRecovery = false;
 let eventsBound = false;
 let kickFlashTimeout = null;
 let morphUpdateFrame = 0;
+let shadePressed = false;
+let shadeLevel = 0;
+let shadeFrame = 0;
+const SHADE_RAMP_TIME = 5.0;
 
 const params = ['bite', 'heat', 'edge', 'pulse', 'haze', 'drift', 'space', 'output'];
 const valueRanges = {
@@ -53,7 +58,8 @@ const els = {
   morphMode: document.getElementById('morphMode'),
   pitchWheel: document.getElementById('pitchWheel'),
   pitchValue: document.getElementById('pitchValue'),
-  kickButton: document.getElementById('kickButton')
+  kickButton: document.getElementById('kickButton'),
+  shadeButton: document.getElementById('shadeButton')
 };
 
 const inputSensitivity = {
@@ -341,6 +347,57 @@ function bindEvents() {
 
   els.kickButton.addEventListener('click', kickHandler, { passive: false });
   els.kickButton.addEventListener('pointerdown', kickHandler, { passive: false });
+
+  const setShade = (pressed) => {
+    shadePressed = pressed;
+    state.shade = pressed;
+    if (!shadeFrame) shadeFrame = window.requestAnimationFrame(shadeLoop);
+  };
+
+  const shadeDown = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    els.shadeButton.setPointerCapture?.(event.pointerId);
+    setShade(true);
+  };
+
+  const shadeUp = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setShade(false);
+  };
+
+  els.shadeButton.addEventListener('pointerdown', shadeDown, { passive: false });
+  els.shadeButton.addEventListener('pointerup', shadeUp, { passive: false });
+  els.shadeButton.addEventListener('pointercancel', shadeUp, { passive: false });
+  els.shadeButton.addEventListener('lostpointercapture', () => setShade(false));
+}
+
+
+function shadeLoop(now) {
+  const previous = shadeLoop.lastTime || now;
+  const deltaTime = Math.min((now - previous) / 1000, 0.05);
+  shadeLoop.lastTime = now;
+
+  const target = shadePressed ? 1 : 0;
+  const step = deltaTime / SHADE_RAMP_TIME;
+  if (shadeLevel < target) shadeLevel = Math.min(target, shadeLevel + step);
+  if (shadeLevel > target) shadeLevel = Math.max(target, shadeLevel - step);
+
+  els.shadeButton.style.setProperty('--shade-intensity', shadeLevel.toFixed(4));
+  els.shadeButton.classList.toggle('shade-active', shadeLevel > 0.02);
+  const label = shadeLevel > 0.95 ? 'SHADE ACTIVE' : shadeLevel > 0.08 ? `HOLDING ${Math.round(shadeLevel * 5)}S` : 'HOLD 5S SHADE';
+  const labelEl = els.shadeButton.querySelector('.shade-label');
+  if (labelEl) labelEl.textContent = label;
+
+  if (engine?.updateShade) engine.updateShade(shadeLevel);
+
+  if (shadePressed || shadeLevel > 0.001) {
+    shadeFrame = window.requestAnimationFrame(shadeLoop);
+  } else {
+    shadeFrame = 0;
+    shadeLoop.lastTime = 0;
+  }
 }
 
 
@@ -561,7 +618,8 @@ function renderStatus(overrideText = '') {
   }
 
   const modeName = state.morph < 0.22 ? 'Day voice' : state.morph > 0.78 ? 'Night voice' : 'Twilight voice';
-  els.statusText.textContent = `${modeName} • pitch ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
+  const shadeText = shadeLevel > 0.05 ? ` • shade ${Math.round(shadeLevel * 100)}%` : '';
+  els.statusText.textContent = `${modeName} • pitch ${state.pitch > 0 ? '+' : ''}${state.pitch} st${shadeText}`;
 }
 
 function renderPresetButtons() {
@@ -794,7 +852,7 @@ async function createDayNightManEngine(initialState) {
       const output = dbToGain(next.output ?? -9) * (next.power ? 1 : 0);
       const baseHz = 58 - morph * 8;
       const bodyHz = 118 - morph * 18;
-      const kickLevel = Math.max(output * (1.15 + space * 0.95), 0.16);
+      const kickLevel = Math.max(output * (1.8 + space * 1.2), 0.28);
 
       const osc = context.createOscillator();
       osc.type = 'sine';
@@ -803,6 +861,8 @@ async function createDayNightManEngine(initialState) {
       const amp = context.createGain();
       const bodyGain = context.createGain();
 
+      osc.connect(amp).connect(compressor);
+      body.connect(bodyGain).connect(compressor);
       osc.connect(amp).connect(kickFilter);
       body.connect(bodyGain).connect(kickFilter);
 
@@ -825,6 +885,14 @@ async function createDayNightManEngine(initialState) {
       body.start(now);
       osc.stop(now + 0.8 + space * 0.35);
       body.stop(now + 0.5 + space * 0.2);
+    },
+    updateShade(level) {
+      const shade = clamp(level, 0, 1);
+      const now = context.currentTime;
+      filter.frequency.setTargetAtTime(Math.max(180, filter.frequency.value * (1 - shade * 0.55)), now, 0.08);
+      filter.Q.setTargetAtTime(filter.Q.value + shade * 0.35, now, 0.08);
+      dryGain.gain.setTargetAtTime(Math.max(0.18, dryGain.gain.value * (1 - shade * 0.18)), now, 0.08);
+      delayWet.gain.setTargetAtTime(delayWet.gain.value + shade * 0.04, now, 0.08);
     }
   };
 

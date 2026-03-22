@@ -192,6 +192,49 @@ h1 {
   margin: 10px 0 0;
 }
 
+.utility-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.shade-button {
+  --shade-intensity: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(180deg, rgba(22,22,26,0.92), rgba(8,8,10,0.98));
+  color: rgba(244, 230, 220, calc(0.8 + var(--shade-intensity) * 0.2));
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 0 calc(6px + 26px * var(--shade-intensity)) rgba(255, 62, 62, calc(0.1 + var(--shade-intensity) * 0.28));
+}
+
+.shade-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(140, 26, 26, 0.9) 55%, rgba(46, 6, 6, 1));
+  box-shadow: 0 0 calc(4px + 14px * var(--shade-intensity)) rgba(255, 60, 60, calc(0.2 + var(--shade-intensity) * 0.45));
+}
+
+.shade-button.shade-active {
+  border-color: rgba(255, 90, 90, calc(0.25 + var(--shade-intensity) * 0.55));
+  background: linear-gradient(180deg, rgba(82, 16, 20, calc(0.32 + var(--shade-intensity) * 0.42)), rgba(20,6,8,0.98));
+}
+
+.shade-button:active {
+  transform: translateY(1px);
+}
+
 .synth-object {
   padding: 18px 14px 20px;
   overflow: visible;
