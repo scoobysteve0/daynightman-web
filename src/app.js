@@ -3,10 +3,12 @@
 // bite: (Dayman) Aggression, filter brightness, harmonic content
 // heat: (Dayman) Saturation, drive intensity
 // edge: (Dayman) LFO speed, rhythmic movement, delay mix
+// pulse: Wave modulation speed (Dayman: fast/sync, Nightman: slow/ambient)
 // haze: (Nightman) Filter softness, blur amount
 // drift: (Nightman) Filter movement, LFO depth
 // space: (Nightman) Wet/dry, delay time, reverb width
 // output: Master volume in dB
+// shade: Momentary gesture - hold to darken (works in both modes)
 // === END CONTROL MAPPING ===
 
 const defaults = {
@@ -16,6 +18,7 @@ const defaults = {
   bite: 62,
   heat: 58,
   edge: 45,
+  pulse: 40,
   haze: 48,
   drift: 36,
   space: 28,
@@ -24,22 +27,23 @@ const defaults = {
 };
 
 const presets = {
-  Daybreak: { power: true, mode: 'day', pitch: 0, bite: 66, heat: 60, edge: 51, haze: 18, drift: 24, space: 19, output: -10, preset: 'Daybreak' },
-  Nightfog: { power: true, mode: 'night', pitch: -12, bite: 22, heat: 34, edge: 18, haze: 74, drift: 56, space: 63, output: -11, preset: 'Nightfog' },
-  Streetlamp: { power: true, mode: 'night', pitch: 7, bite: 40, heat: 48, edge: 22, haze: 62, drift: 49, space: 54, output: -8, preset: 'Streetlamp' },
-  Spotlight: { power: true, mode: 'day', pitch: 12, bite: 82, heat: 70, edge: 72, haze: 12, drift: 15, space: 12, output: -7, preset: 'Spotlight' }
+  Daybreak: { power: true, mode: 'day', pitch: 0, bite: 66, heat: 60, edge: 51, pulse: 45, haze: 18, drift: 24, space: 19, output: -10, preset: 'Daybreak' },
+  Nightfog: { power: true, mode: 'night', pitch: -12, bite: 22, heat: 34, edge: 18, pulse: 25, haze: 74, drift: 56, space: 63, output: -11, preset: 'Nightfog' },
+  Streetlamp: { power: true, mode: 'night', pitch: 7, bite: 40, heat: 48, edge: 22, pulse: 30, haze: 62, drift: 49, space: 54, output: -8, preset: 'Streetlamp' },
+  Spotlight: { power: true, mode: 'day', pitch: 12, bite: 82, heat: 70, edge: 72, pulse: 60, haze: 12, drift: 15, space: 12, output: -7, preset: 'Spotlight' }
 };
 
 const state = loadState();
 let engine = null;
 
-const valueIds = ['pitch', 'bite', 'heat', 'edge', 'haze', 'drift', 'space', 'output'];
+const valueIds = ['pitch', 'bite', 'heat', 'edge', 'pulse', 'haze', 'drift', 'space', 'output'];
 const els = {
   startButton: document.getElementById('startButton'),
   statusText: document.getElementById('statusText'),
   copyLinkButton: document.getElementById('copyLinkButton'),
   powerButton: document.getElementById('powerButton'),
   modeButton: document.getElementById('modeButton'),
+  shadeButton: document.getElementById('shadeButton'),
   presetList: document.getElementById('presetList')
 };
 
@@ -109,14 +113,28 @@ function bindEvents() {
   els.startButton.addEventListener('touchstart', startHandler, { passive: false });
   els.startButton.addEventListener('click', startHandler);
 
-  // Power/mode buttons also get touch handling
-  ['powerButton', 'modeButton'].forEach(id => {
+  // Power/mode/shade buttons also get touch handling
+  ['powerButton', 'modeButton', 'shadeButton'].forEach(id => {
     const btn = els[id];
     btn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       btn.click();
     }, { passive: false });
   });
+
+  // Shade is a hold button - track press/release
+  let shadePressed = false;
+  els.shadeButton.addEventListener('mousedown', () => { shadePressed = true; updateShade(); });
+  els.shadeButton.addEventListener('mouseup', () => { shadePressed = false; updateShade(); });
+  els.shadeButton.addEventListener('mouseleave', () => { shadePressed = false; updateShade(); });
+  els.shadeButton.addEventListener('touchstart', (e) => { e.preventDefault(); shadePressed = true; updateShade(); }, { passive: false });
+  els.shadeButton.addEventListener('touchend', (e) => { e.preventDefault(); shadePressed = false; updateShade(); }, { passive: false });
+
+  function updateShade() {
+    state.shade = shadePressed;
+    syncAndRender();
+    if (engine) engine.update(state);
+  }
 
   els.copyLinkButton.addEventListener('click', async () => {
     saveState();
@@ -165,6 +183,7 @@ function render() {
   els.biteValue.textContent = `${state.bite}%`;
   els.heatValue.textContent = `${state.heat}%`;
   els.edgeValue.textContent = `${state.edge}%`;
+  els.pulseValue.textContent = `${state.pulse}%`;
   els.hazeValue.textContent = `${state.haze}%`;
   els.driftValue.textContent = `${state.drift}%`;
   els.spaceValue.textContent = `${state.space}%`;
@@ -174,6 +193,8 @@ function render() {
   els.modeButton.textContent = state.mode === 'day' ? 'Dayman' : 'Nightman';
   els.powerButton.classList.toggle('active', state.power);
   els.modeButton.classList.toggle('active', state.mode === 'night');
+  els.shadeButton.classList.toggle('active', state.shade);
+  els.shadeButton.textContent = state.shade ? 'Active' : 'Hold';
 
   // Visual feedback: start button shows audio state
   if (engine?.started) {
@@ -189,7 +210,8 @@ function render() {
   } else if (!state.power) {
     els.statusText.textContent = 'Audio engine is live, but Power is off.';
   } else {
-    els.statusText.textContent = `${state.mode === 'day' ? 'Dayman' : 'Nightman'} running. Preset: ${state.preset}.`;
+    const shadeNote = state.shade ? ' [Shade active]' : '';
+    els.statusText.textContent = `${state.mode === 'day' ? 'Dayman' : 'Nightman'} running. Preset: ${state.preset}.${shadeNote}`;
   }
 
   renderPresetButtons();
@@ -212,116 +234,160 @@ function renderPresetButtons() {
   }
 }
 
-// Enhanced DSP engine with stronger Dayman vs Nightman contrast
+// Enhanced DSP engine - Lyra-8 inspired Dayman + Audra-2 inspired Nightman
 async function createDayNightManEngine(initialState) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = ctx.currentTime;
 
-  // Main oscillators
-  const osc1 = ctx.createOscillator();
-  const osc2 = ctx.createOscillator();
-  const osc1Gain = ctx.createGain();
-  const osc2Gain = ctx.createGain();
+  // === LYRA-8 INSPIRED DAYMAN VOICE ===
+  // Multiple detuned sines for drone cluster, subtle noise, phase variation
+  const dayOscs = [];
+  const dayOscGains = [];
+  const dayDetuneBase = [0, 3, 7, 10, 14, 17, 21, 24]; // spread intervals
+  for (let i = 0; i < 4; i++) {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.detune.value = dayDetuneBase[i] + (Math.random() - 0.5) * 4;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.25 - i * 0.03;
+    dayOscs.push(osc);
+    dayOscGains.push(gain);
+  }
 
-  // Sub oscillator for depth
+  // Sub for grounding
   const subOsc = ctx.createOscillator();
+  subOsc.type = 'sine';
   const subGain = ctx.createGain();
 
-  // Pre-processing mix
+  // Dayman noise layer (subtle texture)
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const noiseData = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < noiseData.length; i++) {
+    noiseData[i] = (Math.random() * 2 - 1) * 0.02;
+  }
+  const noiseSource = ctx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 3000;
+  noiseFilter.Q.value = 0.5;
+
+  // === NIGHTMAN VOICE (Audra-2 inspired dark ambient) ===
+  const nightOsc1 = ctx.createOscillator();
+  const nightOsc2 = ctx.createOscillator();
+  nightOsc1.type = 'sine';
+  nightOsc2.type = 'triangle';
+  const nightGain1 = ctx.createGain();
+  const nightGain2 = ctx.createGain();
+
+  // === SHARED SIGNAL PATH ===
   const preMix = ctx.createGain();
-  const preFilterGain = ctx.createGain();
-
-  // Filter stage - key for timbral shaping
   const filter = ctx.createBiquadFilter();
-
-  // Waveshaper for saturation/drive
   const shaper = ctx.createWaveShaper();
+  const postFilterGain = ctx.createGain();
 
-  // Delay/reverb section for space
-  const wetGain = ctx.createGain();
-  const dryGain = ctx.createGain();
-  const feedbackGain = ctx.createGain();
-  const delay = ctx.createDelay(2.0);
+  // === SPACE SECTION ===
+  // Delay
+  const delay = ctx.createDelay(2.5);
+  const delayFeedback = ctx.createGain();
+  const delayWet = ctx.createGain();
   const delayFilter = ctx.createBiquadFilter();
+  delayFilter.type = 'lowpass';
+  delayFilter.frequency.value = 4000;
 
-  // LFO for movement
-  const lfo = ctx.createOscillator();
-  const lfoDepth = ctx.createGain();
-  const lfoBias = ctx.createConstantSource();
-  const edgeGain = ctx.createGain();
-  const driftGain = ctx.createGain();
-  const motionSum = ctx.createGain();
+  // Subtle reverb using delay network (no convolver for performance)
+  const reverbDelay1 = ctx.createDelay(0.1);
+  const reverbDelay2 = ctx.createDelay(0.15);
+  const reverbDelay3 = ctx.createDelay(0.2);
+  const reverbFeedback = ctx.createGain();
+  const reverbWet = ctx.createGain();
+  reverbDelay1.delayTime.value = 0.07;
+  reverbDelay2.delayTime.value = 0.11;
+  reverbDelay3.delayTime.value = 0.16;
+  reverbFeedback.gain.value = 0.25;
 
-  // Master output
+  const dryGain = ctx.createGain();
   const outputGain = ctx.createGain();
   const compressor = ctx.createDynamicsCompressor();
 
-  // Initial routing
-  osc1.type = 'sine';
-  osc2.type = 'sawtooth';
-  subOsc.type = 'sine';
-  subOsc.frequency.value = 0.5; // octave below
-
-  osc1Gain.gain.value = 0.5;
-  osc2Gain.gain.value = 0.35;
-  subGain.gain.value = 0.15;
-
-  preMix.gain.value = 1;
-  preFilterGain.gain.value = 1;
-
-  filter.type = 'highpass';
-  filter.Q.value = 1;
-
-  wetGain.gain.value = 0.15;
-  dryGain.gain.value = 0.85;
-  feedbackGain.gain.value = 0.25;
-  delay.delayTime.value = 0.3;
-  delayFilter.type = 'lowpass';
-  delayFilter.frequency.value = 3000;
-
+  // === LFO SECTION ===
+  const lfo = ctx.createOscillator();
+  const lfoDepth = ctx.createGain();
+  const lfoBias = ctx.createConstantSource();
   lfo.type = 'sine';
-  lfo.frequency.value = 0.5;
-  lfoDepth.gain.value = 0.2;
   lfoBias.offset.value = 0.5;
 
-  outputGain.gain.value = 0;
-  compressor.threshold.value = -12;
-  compressor.knee.value = 10;
-  compressor.ratio.value = 4;
+  // Modulation targets
+  const filterMod = ctx.createGain();
+  const pitchMod = ctx.createGain();
+  const phaseMod = ctx.createGain(); // for subtle drift
 
-  // Connect audio graph
-  osc1.connect(osc1Gain).connect(preMix);
-  osc2.connect(osc2Gain).connect(preMix);
+  // Random instability generator
+  let instabilitySeed = 0;
+  const updateInstability = () => {
+    instabilitySeed += 0.001;
+    return Math.sin(instabilitySeed * 12345.6789) * 2;
+  };
+
+  // === WIRING ===
+  // Day oscillators → preMix
+  dayOscs.forEach((osc, i) => osc.connect(dayOscGains[i]).connect(preMix));
   subOsc.connect(subGain).connect(preMix);
+  noiseSource.connect(noiseFilter).connect(noiseGain).connect(preMix);
 
-  preMix.connect(preFilterGain);
-  preFilterGain.connect(filter);
-  preFilterGain.connect(dryGain);
+  // Night oscillators → preMix (switched)
+  nightOsc1.connect(nightGain1).connect(preMix);
+  nightOsc2.connect(nightGain2).connect(preMix);
 
-  filter.connect(shaper);
-  shaper.connect(wetGain);
+  // Shared path
+  preMix.connect(filter);
+  filter.connect(postFilterGain);
+  postFilterGain.connect(shaper);
+  shaper.connect(dryGain);
   shaper.connect(delay);
-  delay.connect(delayFilter).connect(wetGain);
-  delay.connect(feedbackGain).connect(delay);
 
+  // Delay network
+  delay.connect(delayFilter).connect(delayWet);
+  delay.connect(delayFeedback).connect(delay);
+  delayFeedback.gain.value = 0.3;
+
+  // Reverb network (subtle)
+  shaper.connect(reverbDelay1);
+  shaper.connect(reverbDelay2);
+  shaper.connect(reverbDelay3);
+  reverbDelay1.connect(reverbWet);
+  reverbDelay2.connect(reverbWet);
+  reverbDelay3.connect(reverbWet);
+  reverbDelay1.connect(reverbFeedback).connect(reverbDelay2);
+  reverbDelay2.connect(reverbFeedback).connect(reverbDelay3);
+  reverbDelay3.connect(reverbFeedback).connect(reverbDelay1);
+  reverbFeedback.gain.value = 0.2;
+
+  // To output
   dryGain.connect(outputGain);
-  wetGain.connect(outputGain);
+  delayWet.connect(outputGain);
+  reverbWet.connect(outputGain);
   outputGain.connect(compressor);
   compressor.connect(ctx.destination);
 
-  // LFO modulation routing
-  lfo.connect(lfoDepth).connect(motionSum);
-  lfoBias.connect(motionSum);
-  motionSum.connect(edgeGain.gain);
-  motionSum.connect(driftGain.gain);
+  // LFO modulation
+  lfo.connect(lfoDepth).connect(filterMod.gain);
+  lfoBias.connect(filterMod.gain);
+  lfoDepth.connect(pitchMod.gain);
+  filterMod.connect(filter.detune);
+  pitchMod.connect(dayOscs[0].detune);
+
+  // Start oscillators
+  dayOscs.forEach(osc => osc.start());
+  subOsc.start();
+  noiseSource.start();
+  nightOsc1.start();
+  nightOsc2.start();
   lfo.start();
   lfoBias.start();
-
-  edgeGain.connect(osc2.detune);
-  driftGain.connect(filter.detune);
-
-  osc1.start();
-  osc2.start();
-  subOsc.start();
 
   const api = {
     started: false,
@@ -331,88 +397,126 @@ async function createDayNightManEngine(initialState) {
     },
     update(next) {
       const power = next.power ? 1 : 0;
-      const bite = next.bite / 100;      // Day: aggression, grit
-      const heat = next.heat / 100;      // Saturation, drive
-      const edge = next.edge / 100;       // Day: harmonic content
-      const haze = next.haze / 100;      // Night: softness, blur
-      const drift = next.drift / 100;    // Filter movement amount
-      const space = next.space / 100;    // Wet/dry, width
+      const bite = next.bite / 100;
+      const heat = next.heat / 100;
+      const edge = next.edge / 100;
+      const pulse = next.pulse / 100;
+      const haze = next.haze / 100;
+      const drift = next.drift / 100;
+      const space = next.space / 100;
       const night = next.mode === 'night';
+      const shade = next.shade || false;
 
-      // Base pitch
       const baseNote = 48 + next.pitch;
       const baseHz = midiToHz(baseNote);
 
-      // === DAYMAN vs NIGHTMAN TIMBRE CONTRAST ===
+      // Add subtle instability
+      const instability = updateInstability();
+
+      // === SHADE GESTION - darken without muting ===
+      const shadeFactor = shade ? 0.4 : 1.0;
+      const shadeFilterOffset = shade ? -800 : 0;
+      const shadeLevelOffset = shade ? -6 : 0; // dB
+
       if (night) {
-        // NIGHTMAN: darker, wider, hazier, ambient
-        osc2.type = 'triangle';
+        // === NIGHTMAN (Audra-2 inspired) ===
+        // Keep mostly intact, preserve dark ambient
+        nightGain1.gain.setTargetAtTime(0.35, ctx.currentTime, 0.05);
+        nightGain2.gain.setTargetAtTime(0.25 + haze * 0.2, ctx.currentTime, 0.05);
+
+        nightOsc1.frequency.setTargetAtTime(baseHz * 0.998 + instability, ctx.currentTime, 0.05);
+        nightOsc2.frequency.setTargetAtTime(baseHz * (1.002 + haze * 0.02), ctx.currentTime, 0.05);
+
         filter.type = 'lowpass';
+        filter.frequency.setTargetAtTime(mapRange(haze, 200, 1800) + shadeFilterOffset, ctx.currentTime, 0.05);
+        filter.Q.setTargetAtTime(mapRange(space, 0.5, 6) * shadeFactor, ctx.currentTime, 0.05);
 
-        // Filter opens with haze (darker base, opens up with more haze)
-        const nightFilterFreq = mapRange(haze, 150, 2200);
-        filter.frequency.setTargetAtTime(nightFilterFreq, ctx.currentTime, 0.05);
-        filter.Q.setTargetAtTime(mapRange(space, 0.5, 8), ctx.currentTime, 0.05);
+        // Night LFO - slow, ambient
+        const nightPulse = mapRange(pulse, 0.02, 0.3);
+        lfo.frequency.setTargetAtTime(nightPulse, ctx.currentTime, 0.05);
+        lfoDepth.gain.setTargetAtTime(mapRange(drift, 0.1, 0.35), ctx.currentTime, 0.05);
+        filterMod.gain.setTargetAtTime(drift * 180, ctx.currentTime, 0.05);
 
-        // Sub oscillator prominent in night
-        subGain.gain.setTargetAtTime(0.25 + haze * 0.2, ctx.currentTime, 0.05);
-        osc2.frequency.setTargetAtTime(baseHz * 1.002, ctx.currentTime, 0.05);
-        osc1.frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
+        // Night delay/reverb - wider
+        const nightSpace = mapRange(space, 0.15, 0.7) * shadeFactor;
+        delayWet.gain.setTargetAtTime(nightSpace * 0.7, ctx.currentTime, 0.05);
+        dryGain.gain.setTargetAtTime(1 - nightSpace * 0.5, ctx.currentTime, 0.05);
+        delay.delayTime.setTargetAtTime(mapRange(space, 0.25, 0.9), ctx.currentTime, 0.05);
+        delayFeedback.gain.setTargetAtTime(mapRange(space, 0.15, 0.55) * shadeFactor, ctx.currentTime, 0.05);
 
-        // LFO slower, more ambient in night
-        lfo.frequency.setTargetAtTime(mapRange(drift, 0.03, 0.25), ctx.currentTime, 0.05);
-        lfoDepth.gain.setTargetAtTime(0.15 + drift * 0.3, ctx.currentTime, 0.05);
-        driftGain.gain.setTargetAtTime(drift * 150, ctx.currentTime, 0.05);
-        edgeGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05); // no edge in night
+        // Subtle reverb for night
+        reverbWet.gain.setTargetAtTime(space * 0.12 * shadeFactor, ctx.currentTime, 0.05);
 
-        // More space/wet in night
-        const nightWet = mapRange(space, 0.1, 0.65);
-        wetGain.gain.setTargetAtTime(nightWet, ctx.currentTime, 0.05);
-        dryGain.gain.setTargetAtTime(1 - nightWet, ctx.currentTime, 0.05);
-        delay.delayTime.setTargetAtTime(mapRange(space, 0.2, 0.8), ctx.currentTime, 0.05);
-        feedbackGain.gain.setTargetAtTime(mapRange(space, 0.1, 0.6), ctx.currentTime, 0.05);
+        // Night drive - soft
+        shaper.curve = makeDriveCurve((1 + haze * 0.6) * 10 * shadeFactor);
 
-        // Softer drive in night
-        const nightDrive = 1 + haze * 0.8;
-        shaper.curve = makeDriveCurve(nightDrive * 12);
-        preFilterGain.gain.setTargetAtTime(0.7 + drift * 0.15, ctx.currentTime, 0.05);
+        // Disable day oscs
+        dayOscGains.forEach(g => g.gain.setTargetAtTime(0, ctx.currentTime, 0.1));
+        noiseGain.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+        subGain.gain.setTargetAtTime(0.3 + haze * 0.15, ctx.currentTime, 0.05);
 
       } else {
-        // DAYMAN: brighter, tighter, more aggressive
-        osc2.type = 'sawtooth';
-        filter.type = 'highpass';
+        // === DAYMAN (Lyra-8 inspired) ===
+        // Airy, droney, tactile, unstable, alive
 
-        // Filter opens with bite (brighter base, more responsive)
-        const dayFilterFreq = mapRange(bite, 800, 7500);
+        // Enable day oscs with spread
+        dayOscGains.forEach((g, i) => {
+          g.gain.setTargetAtTime((0.22 - i * 0.03) * shadeFactor, ctx.currentTime, 0.05);
+        });
+
+        // More detune spread
+        const detuneSpread = bite * 25;
+        dayOscs.forEach((osc, i) => {
+          const baseDetune = dayDetuneBase[i] * detuneSpread / 20;
+          osc.detune.setTargetAtTime(baseDetune + instability * 3, ctx.currentTime, 0.05);
+        });
+        dayOscs[0].frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
+        dayOscs[1].frequency.setTargetAtTime(baseHz * 1.003 + instability, ctx.currentTime, 0.05);
+        dayOscs[2].frequency.setTargetAtTime(baseHz * 1.007, ctx.currentTime, 0.05);
+        dayOscs[3].frequency.setTargetAtTime(baseHz * 1.012, ctx.currentTime, 0.05);
+
+        // Subtle noise layer for air
+        noiseGain.gain.setTargetAtTime(bite * 0.015 * shadeFactor, ctx.currentTime, 0.05);
+        noiseFilter.frequency.setTargetAtTime(2000 + bite * 2000, ctx.currentTime, 0.05);
+
+        // Filter - airy, not harsh
+        filter.type = 'bandpass';
+        const dayFilterFreq = mapRange(bite, 400, 2500) + shadeFilterOffset;
         filter.frequency.setTargetAtTime(dayFilterFreq, ctx.currentTime, 0.05);
-        filter.Q.setTargetAtTime(mapRange(heat, 1, 9), ctx.currentTime, 0.05);
+        filter.Q.setTargetAtTime(0.8 + heat * 1.5, ctx.currentTime, 0.05);
 
-        // Sub less prominent in day
-        subGain.gain.setTargetAtTime(0.08 + bite * 0.1, ctx.currentTime, 0.05);
-        osc2.frequency.setTargetAtTime(baseHz * (1.5 + bite * 1.0), ctx.currentTime, 0.05);
-        osc1.frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
+        // Pulse controls LFO rate
+        const dayPulse = mapRange(pulse, 0.08, 1.5);
+        lfo.frequency.setTargetAtTime(dayPulse, ctx.currentTime, 0.05);
+        lfoDepth.gain.setTargetAtTime(0.15 + edge * 0.35, ctx.currentTime, 0.05);
+        filterMod.gain.setTargetAtTime(edge * 60 + drift * 30, ctx.currentTime, 0.05);
 
-        // LFO faster, more rhythmic in day
-        lfo.frequency.setTargetAtTime(mapRange(edge, 0.15, 1.8), ctx.currentTime, 0.05);
-        lfoDepth.gain.setTargetAtTime(0.2 + edge * 0.4, ctx.currentTime, 0.05);
-        edgeGain.gain.setTargetAtTime(edge * 120, ctx.currentTime, 0.05);
-        driftGain.gain.setTargetAtTime(drift * 40, ctx.currentTime, 0.05);
+        // Day delay - interacts with tone
+        const daySpace = mapRange(space, 0.05, 0.4) * shadeFactor;
+        delayWet.gain.setTargetAtTime(daySpace * 0.5, ctx.currentTime, 0.05);
+        dryGain.gain.setTargetAtTime(1 - daySpace * 0.3, ctx.currentTime, 0.05);
+        delay.delayTime.setTargetAtTime(mapRange(edge, 0.08, 0.25), ctx.currentTime, 0.05);
+        delayFeedback.gain.setTargetAtTime(mapRange(edge, 0.08, 0.35) * shadeFactor, ctx.currentTime, 0.05);
 
-        // Less space/wet in day (tighter)
-        const dayWet = mapRange(space, 0.05, 0.35);
-        wetGain.gain.setTargetAtTime(dayWet, ctx.currentTime, 0.05);
-        dryGain.gain.setTargetAtTime(1 - dayWet, ctx.currentTime, 0.05);
-        delay.delayTime.setTargetAtTime(mapRange(edge, 0.06, 0.2), ctx.currentTime, 0.05);
-        feedbackGain.gain.setTargetAtTime(mapRange(edge, 0.05, 0.3), ctx.currentTime, 0.05);
+        // Subtle reverb for day
+        reverbWet.gain.setTargetAtTime(space * 0.06 * shadeFactor, ctx.currentTime, 0.05);
 
-        // Stronger drive in day
-        const dayDrive = 1 + heat * 2.5;
-        shaper.curve = makeDriveCurve(dayDrive * 22);
-        preFilterGain.gain.setTargetAtTime(0.75 + heat * 0.2, ctx.currentTime, 0.05);
+        // Day drive - warm, not harsh
+        const dayDrive = 1 + heat * 1.8;
+        shaper.curve = makeDriveCurve(dayDrive * 8 * shadeFactor);
+
+        // Sub in day
+        subGain.gain.setTargetAtTime(0.1 + bite * 0.08, ctx.currentTime, 0.05);
+        subOsc.frequency.setTargetAtTime(baseHz * 0.5, ctx.currentTime, 0.05);
+
+        // Disable night oscs
+        nightGain1.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
+        nightGain2.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
       }
 
-      // Output level with soft knee
-      outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.28, ctx.currentTime, 0.05);
+      // Output with shade
+      const outputDb = next.output + shadeLevelOffset;
+      outputGain.gain.setTargetAtTime(dbToGain(outputDb) * power * 0.25, ctx.currentTime, 0.05);
     }
   };
 
