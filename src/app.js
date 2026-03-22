@@ -511,13 +511,6 @@ function updateMorphUI() {
   setCssVar('--panel-hi-g', panelHi[1]);
   setCssVar('--panel-hi-b', panelHi[2]);
 
-  const dayOpacity = clamp(1 - morph * 1.6, 0, 1);
-  const twilightOpacity = clamp(1 - Math.abs(morph - 0.5) * 2.6, 0, 1);
-  const nightOpacity = clamp((morph - 0.35) / 0.65, 0, 1);
-  setCssVar('--scene-day-opacity', dayOpacity.toFixed(4));
-  setCssVar('--scene-twilight-opacity', twilightOpacity.toFixed(4));
-  setCssVar('--scene-night-opacity', nightOpacity.toFixed(4));
-
   const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'TWILIGHT';
   els.morphMode.textContent = modeName;
   renderStatus();
@@ -567,7 +560,7 @@ function renderStatus(overrideText = '') {
     return;
   }
 
-  const modeName = state.morph < 0.22 ? 'Day chassis' : state.morph > 0.78 ? 'Night chassis' : 'Twilight morph';
+  const modeName = state.morph < 0.22 ? 'Day voice' : state.morph > 0.78 ? 'Night voice' : 'Twilight voice';
   els.statusText.textContent = `${modeName} • pitch ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
 }
 
@@ -659,6 +652,8 @@ async function createDayNightManEngine(initialState) {
   kickDrive.curve = makeDriveCurve(10);
   const kickSend = context.createGain();
   kickSend.gain.value = 0;
+  const kickDirect = context.createGain();
+  kickDirect.gain.value = 0.9;
 
   const outputGain = context.createGain();
   const compressor = context.createDynamicsCompressor();
@@ -685,7 +680,9 @@ async function createDayNightManEngine(initialState) {
   shaper.connect(revDly2).connect(reverbWet);
   shaper.connect(revDly3).connect(reverbWet);
 
-  kickFilter.connect(kickDrive).connect(kickSend);
+  kickFilter.connect(kickDrive);
+  kickDrive.connect(kickDirect).connect(outputGain);
+  kickDrive.connect(kickSend);
   kickSend.connect(revDly1);
   kickSend.connect(revDly2);
   kickSend.connect(revDly3);
@@ -797,7 +794,7 @@ async function createDayNightManEngine(initialState) {
       const output = dbToGain(next.output ?? -9) * (next.power ? 1 : 0);
       const baseHz = 58 - morph * 8;
       const bodyHz = 118 - morph * 18;
-      const kickLevel = output * (0.5 + space * 0.6);
+      const kickLevel = Math.max(output * (1.15 + space * 0.95), 0.16);
 
       const osc = context.createOscillator();
       osc.type = 'sine';
@@ -814,10 +811,10 @@ async function createDayNightManEngine(initialState) {
       amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.34 + space * 0.3);
 
       bodyGain.gain.setValueAtTime(0.0001, now);
-      bodyGain.gain.exponentialRampToValueAtTime(kickLevel * 0.35, now + 0.008);
+      bodyGain.gain.exponentialRampToValueAtTime(kickLevel * 0.55, now + 0.008);
       bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18 + space * 0.1);
 
-      osc.frequency.setValueAtTime(baseHz * 2.4, now);
+      osc.frequency.setValueAtTime(baseHz * 2.9, now);
       osc.frequency.exponentialRampToValueAtTime(baseHz, now + 0.07);
       osc.frequency.exponentialRampToValueAtTime(Math.max(baseHz * 0.82, 32), now + 0.24);
 
