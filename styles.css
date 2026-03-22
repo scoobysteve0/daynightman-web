@@ -75,19 +75,15 @@ h1 { font-size: clamp(2rem, 7vw, 3.5rem); line-height: 0.95; }
 }
 .secondary-button.active { background: rgba(52, 211, 153, 0.18); color: #d1fae5; }
 
-/* Shade button - holds red when active */
+/* Shade button - gradual red over 5 seconds */
 #shadeButton {
-  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  transition: background-color 5s ease, color 5s ease, box-shadow 5s ease;
+  --shade-intensity: 0;
 }
 #shadeButton.shade-active {
-  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  background: linear-gradient(135deg, rgba(220, 38, 38, var(--shade-intensity, 0.5)), rgba(180, 30, 30, var(--shade-intensity, 0.5))) !important;
   color: #fff !important;
-  box-shadow: 0 0 20px rgba(220, 38, 38, 0.5);
-  animation: shadeGlow 0.8s ease-in-out infinite alternate;
-}
-@keyframes shadeGlow {
-  from { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
-  to { box-shadow: 0 0 25px rgba(220, 38, 38, 0.7); }
+  box-shadow: 0 0 calc(15px * var(--shade-intensity, 0.5)) rgba(220, 38, 38, calc(0.4 * var(--shade-intensity, 0.5)));
 }
 .toggle-control button {
   width: 100%;

@@ -123,15 +123,57 @@ function bindEvents() {
     }, { passive: false });
   });
 
-  // Shade is a real hold control. Use pointer events so mouse/touch/pen all behave the same.
+  // Shade is a real hold control with gradual 5-second transition
   let shadePressed = false;
+  let shadeLevel = 0; // 0 = not held, 1 = fully held
+  const SHADE_RAMP_TIME = 5.0; // seconds to full effect
+
   const setShade = (pressed) => {
     if (shadePressed === pressed) return;
     shadePressed = pressed;
     state.shade = pressed;
-    if (engine) engine.update(state);
     syncAndRender();
   };
+
+  // Gradual shade ramp - call this every frame
+  const updateShadeLevel = (deltaTime) => {
+    const target = shadePressed ? 1 : 0;
+    const step = deltaTime / SHADE_RAMP_TIME;
+    if (shadeLevel < target) {
+      shadeLevel = Math.min(target, shadeLevel + step);
+    } else if (shadeLevel > target) {
+      shadeLevel = Math.max(target, shadeLevel - step);
+    }
+
+    // Apply subtle damping based on shade level
+    if (engine && engine.updateShade) {
+      engine.updateShade(shadeLevel);
+    }
+
+    // Update visual - light red that deepens over 5 seconds
+    if (shadeLevel > 0.01) {
+      els.shadeButton.classList.add('shade-active');
+      els.shadeButton.style.setProperty('--shade-intensity', shadeLevel);
+    } else {
+      els.shadeButton.classList.remove('shade-active');
+      els.shadeButton.style.removeProperty('--shade-intensity');
+    }
+    els.shadeButton.textContent = shadeLevel > 0.1 ? (shadeLevel > 0.9 ? 'Active' : 'Holding...') : 'Hold';
+  };
+
+  // Animation frame loop for smooth shade transitions
+  let lastTime = 0;
+  const shadeLoop = (time) => {
+    const deltaTime = lastTime ? (time - lastTime) / 1000 : 0;
+    lastTime = time;
+    if (shadeLevel !== 0 && shadeLevel !== 1) {
+      updateShadeLevel(deltaTime);
+    } else if (shadePressed || shadeLevel > 0) {
+      updateShadeLevel(deltaTime);
+    }
+    requestAnimationFrame(shadeLoop);
+  };
+  requestAnimationFrame(shadeLoop);
 
   els.shadeButton.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -404,9 +446,23 @@ async function createDayNightManEngine(initialState) {
 
   const api = {
     started: false,
+    _shadeLevel: 0,
     async start() {
       if (ctx.state === 'suspended') await ctx.resume();
       this.started = true;
+    },
+    // Gradual shade update - receives level 0-1
+    updateShade(level) {
+      this._shadeLevel = level;
+      // Subtle damping: at full hold, -4dB, filter slightly darkened
+      const damp = level * 0.3; // max -4dB when fully held
+      const filterDamp = 1 - level * 0.25; // filter * 0.75 at full
+      outputGain.gain.setTargetAtTime(dbToGain(-damp * 12) * 0.25, ctx.currentTime, 0.1);
+      // Apply filter dampen
+      if (filter.frequency) {
+        const currentFreq = filter.frequency.value;
+        filter.frequency.setTargetAtTime(currentFreq * filterDamp, ctx.currentTime, 0.3);
+      }
     },
     update(next) {
       const power = next.power ? 1 : 0;
