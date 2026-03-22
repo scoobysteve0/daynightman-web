@@ -1,17 +1,14 @@
-// === DayNightMan - Modular Morph UI ===
-// Controls map to sound: morph (0=day/1=night) drives visual + DSP simultaneously
-
 const defaults = {
   power: false,
-  morph: 0, // 0 = day, 1 = night
+  morph: 0,
   pitch: 0,
-  bite: 62,   // Day: brightness
-  heat: 58,   // Day: drive
-  edge: 45,   // Day: LFO rate
-  pulse: 40,  // shared
-  haze: 48,   // Night: filter softness
-  drift: 36,  // Night: filter movement
-  space: 28,  // Night: wet/dry
+  bite: 62,
+  heat: 58,
+  edge: 45,
+  pulse: 40,
+  haze: 48,
+  drift: 36,
+  space: 28,
   output: -9,
   preset: 'Prototype Default'
 };
@@ -19,27 +16,56 @@ const defaults = {
 const presets = {
   Daybreak: { morph: 0, pitch: 0, bite: 66, heat: 60, edge: 51, pulse: 45, haze: 18, drift: 24, space: 19, output: -10, preset: 'Daybreak' },
   Nightfog: { morph: 1, pitch: -12, bite: 22, heat: 34, edge: 18, pulse: 25, haze: 74, drift: 56, space: 63, output: -11, preset: 'Nightfog' },
-  Streetlamp: { morph: 1, pitch: 7, bite: 40, heat: 48, edge: 22, pulse: 30, haze: 62, drift: 49, space: 54, output: -8, preset: 'Streetlamp' },
-  Spotlight: { morph: 0, pitch: 12, bite: 82, heat: 70, edge: 72, pulse: 60, haze: 12, drift: 15, space: 12, output: -7, preset: 'Spotlight' }
+  Streetlamp: { morph: 0.74, pitch: 7, bite: 40, heat: 48, edge: 22, pulse: 30, haze: 62, drift: 49, space: 54, output: -8, preset: 'Streetlamp' },
+  Spotlight: { morph: 0.12, pitch: 12, bite: 82, heat: 70, edge: 72, pulse: 60, haze: 12, drift: 15, space: 12, output: -7, preset: 'Spotlight' }
 };
 
 const state = loadState();
 let engine = null;
+let audioInitialized = false;
+let audioInitPromise = null;
+let boundVisibilityRecovery = false;
 
-// Parameter definitions for knobs
 const params = ['bite', 'heat', 'edge', 'pulse', 'haze', 'drift', 'space', 'output'];
-
-const els = {
-  startButton: document.getElementById('startButton'),
-  statusText: document.getElementById('statusText'),
-  presetList: document.getElementById('presetList'),
-  morphThumb: document.getElementById('morphThumb'),
-  morphFill: document.getElementById('morphFill'),
-  pitchWheel: document.getElementById('pitchWheel')
+const valueRanges = {
+  bite: { min: 0, max: 100, format: (value) => `${value}%` },
+  heat: { min: 0, max: 100, format: (value) => `${value}%` },
+  edge: { min: 0, max: 100, format: (value) => `${value}%` },
+  pulse: { min: 0, max: 100, format: (value) => `${value}%` },
+  haze: { min: 0, max: 100, format: (value) => `${value}%` },
+  drift: { min: 0, max: 100, format: (value) => `${value}%` },
+  space: { min: 0, max: 100, format: (value) => `${value}%` },
+  output: { min: -24, max: 0, format: (value) => `${value}dB` }
 };
 
-// Get knob elements
-document.querySelectorAll('[data-knob]').forEach(knob => {
+const els = {
+  body: document.body,
+  startButton: document.getElementById('startButton'),
+  powerLamp: document.getElementById('powerLamp'),
+  statusText: document.getElementById('statusText'),
+  presetList: document.getElementById('presetList'),
+  morphTrack: document.getElementById('morphTrack'),
+  morphThumb: document.getElementById('morphThumb'),
+  morphFill: document.getElementById('morphFill'),
+  morphMode: document.getElementById('morphMode'),
+  pitchWheel: document.getElementById('pitchWheel'),
+  pitchValue: document.getElementById('pitchValue')
+};
+
+const inputSensitivity = {
+  knobMouse: 0.45,
+  knobTouch: 0.28,
+  pitchMouse: 24,
+  pitchTouch: 16
+};
+
+const pointerState = {
+  knob: null,
+  morph: null,
+  pitch: null
+};
+
+document.querySelectorAll('[data-knob]').forEach((knob) => {
   const param = knob.dataset.knob;
   els[param] = knob;
   els[`${param}Value`] = document.getElementById(`${param}Value`);
@@ -49,8 +75,6 @@ hydrateControls();
 renderPresetButtons();
 bindEvents();
 render();
-
-// Initial UI sync
 updateMorphUI();
 updatePitchUI();
 
@@ -58,8 +82,14 @@ function loadState() {
   const url = new URL(window.location.href);
   const encoded = url.searchParams.get('state');
   if (!encoded) return { ...defaults };
+
   try {
-    return { ...defaults, ...JSON.parse(atob(encoded)) };
+    const parsed = JSON.parse(atob(encoded));
+    return {
+      ...defaults,
+      ...parsed,
+      output: clamp(parsed.output ?? defaults.output, -24, 0)
+    };
   } catch {
     return { ...defaults };
   }
@@ -72,310 +102,393 @@ function saveState() {
 }
 
 function hydrateControls() {
-  // Sync knob visuals
-  params.forEach(param => {
-    const value = state[param];
+  params.forEach((param) => {
+    const value = normalizeParamValue(param, state[param]);
+    state[param] = value;
     updateKnobVisual(param, value);
+    updateKnobLabel(param, value);
   });
 }
 
-// Update a knob's visual rotation based on value
+function normalizeParamValue(param, rawValue) {
+  const range = valueRanges[param];
+  return clamp(Math.round(rawValue), range.min, range.max);
+}
+
+function percentFromValue(param, value) {
+  const range = valueRanges[param];
+  return (value - range.min) / (range.max - range.min);
+}
+
 function updateKnobVisual(param, value) {
   const knob = els[param];
   if (!knob) return;
-  
+
   const line = knob.querySelector('.knob-line');
   if (!line) return;
-  
-  // Map 0-100 to -135° to +135° (270° range)
-  const percent = value / 100;
-  const angle = -135 + (percent * 270);
-  
-  // Calculate line endpoint using trigonometry
+
+  const percent = percentFromValue(param, value);
+  const angle = -135 + percent * 270;
   const radians = (angle - 90) * (Math.PI / 180);
-  const radius = 26;
+  const radius = 28;
   const x2 = 40 + radius * Math.cos(radians);
   const y2 = 40 + radius * Math.sin(radians);
-  
   line.setAttribute('x2', x2);
   line.setAttribute('y2', y2);
 }
 
+function updateKnobLabel(param, value) {
+  const valueEl = els[`${param}Value`];
+  if (!valueEl) return;
+  valueEl.textContent = valueRanges[param].format(value);
+}
+
 function bindEvents() {
-  let audioInitialized = false;
-  let audioInitPromise = null;
-
-  // === AUDIO START ===
-  const initAudio = async () => {
-    if (audioInitPromise) return audioInitPromise;
-
-    audioInitPromise = (async () => {
-      try {
-        els.statusText.textContent = 'Starting...';
-        if (!engine) engine = await createDayNightManEngine(state);
-        await engine.start();
-        state.power = true;
-        state.preset = 'Custom';
-        engine.update(state);
-        audioInitialized = true;
-        render();
-        els.statusText.textContent = 'Tap play';
-      } catch (error) {
-        console.error('Audio init failed:', error);
-        els.statusText.textContent = `Error: ${error.message}`;
-        audioInitialized = false;
-        audioInitPromise = null;
-      }
-    })();
-    return audioInitPromise;
-  };
-
-  const startHandler = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const startHandler = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     triggerHaptic('medium');
-    
-    if (audioInitialized) {
-      state.power = !state.power;
-      state.preset = 'Custom';
-      if (engine) engine.update(state);
-      saveState();
-      render();
+
+    if (!audioInitialized) {
+      try {
+        await initAudioFromGesture();
+      } catch (error) {
+        console.error('Audio start failed', error);
+        els.statusText.textContent = `Start failed • tap again`;
+      }
       return;
     }
-    
-    try {
-      await initAudio();
-    } catch (error) {
-      els.statusText.textContent = `Could not start: ${error.message}`;
+
+    state.power = !state.power;
+    state.preset = 'Custom';
+    await recoverAudioContext('toggle');
+    engine?.update(state);
+    saveState();
+    render();
+  };
+
+  els.startButton.addEventListener('click', startHandler, { passive: false });
+  els.powerLamp.addEventListener('click', startHandler, { passive: false });
+
+  params.forEach((param) => {
+    const knob = els[param];
+    if (!knob) return;
+
+    knob.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      pointerState.knob = {
+        param,
+        pointerId: event.pointerId,
+        inputType: event.pointerType || 'mouse',
+        startY: event.clientY,
+        startValue: state[param]
+      };
+      knob.setPointerCapture?.(event.pointerId);
+      triggerHaptic('light');
+    });
+
+    knob.addEventListener('pointermove', (event) => {
+      const active = pointerState.knob;
+      if (!active || active.pointerId !== event.pointerId || active.param !== param) return;
+      event.preventDefault();
+
+      const delta = active.startY - event.clientY;
+      const sensitivity = active.inputType === 'touch' ? inputSensitivity.knobTouch : inputSensitivity.knobMouse;
+      const range = valueRanges[param];
+      const nextValue = clamp(Math.round(active.startValue + delta * sensitivity), range.min, range.max);
+
+      state[param] = nextValue;
+      state.preset = 'Custom';
+      updateKnobVisual(param, nextValue);
+      updateKnobLabel(param, nextValue);
+    });
+
+    const finishKnob = async (event) => {
+      const active = pointerState.knob;
+      if (!active || active.pointerId !== event.pointerId || active.param !== param) return;
+      pointerState.knob = null;
+      await updateEngineFromGesture();
+    };
+
+    knob.addEventListener('pointerup', finishKnob);
+    knob.addEventListener('pointercancel', finishKnob);
+    knob.addEventListener('lostpointercapture', finishKnob);
+  });
+
+  els.morphTrack.addEventListener('pointerdown', async (event) => {
+    event.preventDefault();
+    pointerState.morph = {
+      pointerId: event.pointerId,
+      inputType: event.pointerType || 'mouse'
+    };
+    els.morphTrack.setPointerCapture?.(event.pointerId);
+    setMorphFromPointer(event);
+    triggerHaptic('light');
+    await updateEngineFromGesture();
+  });
+
+  els.morphTrack.addEventListener('pointermove', (event) => {
+    const active = pointerState.morph;
+    if (!active || active.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    setMorphFromPointer(event);
+    renderStatus();
+  });
+
+  const finishMorph = async (event) => {
+    const active = pointerState.morph;
+    if (!active || active.pointerId !== event.pointerId) return;
+    pointerState.morph = null;
+    await updateEngineFromGesture();
+  };
+
+  els.morphTrack.addEventListener('pointerup', finishMorph);
+  els.morphTrack.addEventListener('pointercancel', finishMorph);
+  els.morphTrack.addEventListener('lostpointercapture', finishMorph);
+
+  els.pitchWheel.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    const rect = els.pitchWheel.getBoundingClientRect();
+    pointerState.pitch = {
+      pointerId: event.pointerId,
+      inputType: event.pointerType || 'mouse',
+      rect,
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2,
+      startAngle: getAngle(rect.left + rect.width / 2, rect.top + rect.height / 2, event.clientX, event.clientY),
+      startValue: state.pitch
+    };
+    els.pitchWheel.setPointerCapture?.(event.pointerId);
+    triggerHaptic('light');
+  });
+
+  els.pitchWheel.addEventListener('pointermove', (event) => {
+    const active = pointerState.pitch;
+    if (!active || active.pointerId !== event.pointerId) return;
+    event.preventDefault();
+
+    const currentAngle = getAngle(active.centerX, active.centerY, event.clientX, event.clientY);
+    let delta = currentAngle - active.startAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+
+    const fullScale = active.inputType === 'touch' ? inputSensitivity.pitchTouch : inputSensitivity.pitchMouse;
+    const semitoneDelta = Math.round((delta / 360) * fullScale);
+    state.pitch = clamp(active.startValue + semitoneDelta, -24, 24);
+    state.preset = 'Custom';
+    updatePitchUI();
+  });
+
+  const finishPitch = async (event) => {
+    const active = pointerState.pitch;
+    if (!active || active.pointerId !== event.pointerId) return;
+    pointerState.pitch = null;
+    await updateEngineFromGesture();
+  };
+
+  els.pitchWheel.addEventListener('pointerup', finishPitch);
+  els.pitchWheel.addEventListener('pointercancel', finishPitch);
+  els.pitchWheel.addEventListener('lostpointercapture', finishPitch);
+}
+
+async function initAudioFromGesture() {
+  if (audioInitPromise) return audioInitPromise;
+
+  audioInitPromise = (async () => {
+    els.statusText.textContent = 'Waking audio…';
+    if (!engine) engine = await createDayNightManEngine(state);
+
+    await recoverAudioContext('start');
+    await engine.start();
+
+    if (engine.context.state !== 'running') {
+      throw new Error('Audio still suspended');
+    }
+
+    audioInitialized = true;
+    state.power = true;
+    state.preset = 'Custom';
+    engine.update(state);
+    saveState();
+    bindRecoveryHooks();
+    render();
+  })().catch((error) => {
+    audioInitialized = false;
+    audioInitPromise = null;
+    throw error;
+  });
+
+  return audioInitPromise;
+}
+
+async function recoverAudioContext(reason = 'resume') {
+  if (!engine) return false;
+
+  try {
+    if (engine.context.state === 'suspended') {
+      els.statusText.textContent = reason === 'visibility' ? 'Audio sleeping • tap play' : 'Resuming audio…';
+      await engine.context.resume();
+    }
+  } catch (error) {
+    console.warn('AudioContext resume failed', error);
+  }
+
+  const running = engine.context.state === 'running';
+  if (!running) {
+    state.power = false;
+  }
+
+  return running;
+}
+
+function bindRecoveryHooks() {
+  if (boundVisibilityRecovery) return;
+  boundVisibilityRecovery = true;
+
+  const attemptRecovery = async () => {
+    if (!audioInitialized || !engine) return;
+    const running = await recoverAudioContext('visibility');
+    if (running && state.power) {
+      engine.update(state);
+      renderStatus();
+    } else if (!running) {
+      render();
     }
   };
 
-  els.startButton.addEventListener('click', startHandler);
-
-  // === KNOB CONTROLS ===
-  params.forEach(param => {
-    const knob = els[param];
-    if (!knob) return;
-    
-    let knobValue = state[param];
-    let isDragging = false;
-    let startY = 0;
-    let startValue = 0;
-    
-    const onPointerDown = (e) => {
-      e.preventDefault();
-      isDragging = true;
-      startY = e.clientY;
-      startValue = knobValue;
-      knob.setPointerCapture?.(e.pointerId);
-      triggerHaptic('light');
-    };
-    
-    const onPointerMove = (e) => {
-      if (!isDragging) return;
-      const delta = startY - e.clientY;
-      const sensitivity = 0.8;
-      let newValue = startValue + delta * sensitivity;
-      newValue = Math.max(0, Math.min(100, newValue));
-      knobValue = Math.round(newValue);
-      state[param] = knobValue;
-      state.preset = 'Custom';
-      updateKnobVisual(param, knobValue);
-      
-      const valueEl = els[`${param}Value`];
-      if (valueEl) {
-        if (param === 'output') {
-          valueEl.textContent = `${knobValue - 24}dB`; // -24 to 0
-        } else {
-          valueEl.textContent = `${knobValue}%`;
-        }
-      }
-    };
-    
-    const onPointerUp = async () => {
-      if (!isDragging) return;
-      isDragging = false;
-      await ensureEngine();
-      engine.update(state);
-      saveState();
-    };
-    
-    knob.addEventListener('pointerdown', onPointerDown);
-    knob.addEventListener('pointermove', onPointerMove);
-    knob.addEventListener('pointerup', onPointerUp);
-    knob.addEventListener('pointercancel', onPointerUp);
-    knob.addEventListener('lostpointercapture', onPointerUp);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) attemptRecovery();
   });
-
-  // === MORPH SLIDER ===
-  const morphTrack = document.querySelector('.morph-track');
-  let morphDragging = false;
-  
-  const updateMorphFromEvent = (clientY) => {
-    const rect = morphTrack.getBoundingClientRect();
-    let percent = 1 - (clientY - rect.top) / rect.height;
-    percent = Math.max(0, Math.min(1, percent));
-    state.morph = percent;
-    state.preset = 'Custom';
-    updateMorphUI();
-    return percent;
-  };
-  
-  const onMorphPointerDown = (e) => {
-    e.preventDefault();
-    morphDragging = true;
-    const percent = updateMorphFromEvent(e.clientY);
-    els.morphThumb.setPointerCapture?.(e.pointerId);
-    triggerHaptic('light');
-    ensureEngine().then(() => {
-      engine.update(state);
-      saveState();
-    });
-  };
-  
-  const onMorphPointerMove = (e) => {
-    if (!morphDragging) return;
-    updateMorphFromEvent(e.clientY);
-    ensureEngine().then(() => {
-      engine.update(state);
-      saveState();
-    });
-  };
-  
-  const onMorphPointerUp = () => {
-    morphDragging = false;
-    saveState();
-  };
-  
-  els.morphThumb.addEventListener('pointerdown', onMorphPointerDown);
-  els.morphThumb.addEventListener('pointermove', onMorphPointerMove);
-  els.morphThumb.addEventListener('pointerup', onMorphPointerUp);
-  els.morphThumb.addEventListener('pointercancel', onMorphPointerUp);
-  els.morphThumb.addEventListener('lostpointercapture', onMorphPointerUp);
-
-  // === PITCH WHEEL ===
-  let pitchDragging = false;
-  let pitchStartAngle = 0;
-  let pitchStartValue = 0;
-  
-  const getAngle = (cx, cy, x, y) => {
-    return Math.atan2(y - cy, x - cx) * (180 / Math.PI);
-  };
-  
-  const onPitchPointerDown = (e) => {
-    e.preventDefault();
-    pitchDragging = true;
-    const rect = els.pitchWheel.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    pitchStartAngle = getAngle(cx, cy, e.clientX, e.clientY);
-    pitchStartValue = state.pitch;
-    els.pitchWheel.setPointerCapture?.(e.pointerId);
-    triggerHaptic('light');
-  };
-  
-  const onPitchPointerMove = async (e) => {
-    if (!pitchDragging) return;
-    const rect = els.pitchWheel.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const currentAngle = getAngle(cx, cy, e.clientX, e.clientY);
-    let delta = currentAngle - pitchStartAngle;
-    
-    // Wrap delta to -180 to 180
-    if (delta > 180) delta -= 360;
-    if (delta < -180) delta += 360;
-    
-    // Convert angle to semitones (full rotation = 24 semitones)
-    const semitones = Math.round((delta / 360) * 24);
-    let newPitch = pitchStartValue + semitones;
-    newPitch = Math.max(-24, Math.min(24, newPitch));
-    
-    state.pitch = newPitch;
-    state.preset = 'Custom';
-    updatePitchUI();
-    
-    await ensureEngine();
-    engine.update(state);
-    saveState();
-  };
-  
-  const onPitchPointerUp = () => {
-    pitchDragging = false;
-    saveState();
-  };
-  
-  els.pitchWheel.addEventListener('pointerdown', onPitchPointerDown);
-  els.pitchWheel.addEventListener('pointermove', onPitchPointerMove);
-  els.pitchWheel.addEventListener('pointerup', onPitchPointerUp);
-  els.pitchWheel.addEventListener('pointercancel', onPitchPointerUp);
-  els.pitchWheel.addEventListener('lostpointercapture', onPitchPointerUp);
+  window.addEventListener('focus', attemptRecovery);
+  window.addEventListener('pageshow', attemptRecovery);
 }
 
-function updateMorphUI() {
-  const m = state.morph;
-  const thumb = els.morphThumb;
-  const fill = els.morphFill;
-  
-  // Position thumb (0 = bottom, 1 = top)
-  const bottom = 0;
-  const top = 156; // 180 - 24 (thumb height)
-  const pos = bottom + m * (top - bottom);
-  thumb.style.bottom = `${pos}px`;
-  
-  // Fill height
-  fill.style.height = `${m * 100}%`;
-  
-  // Body class for theming
-  if (m > 0.5) {
-    document.body.classList.add('night-mode');
-  } else {
-    document.body.classList.remove('night-mode');
-  }
-  
-  // Update status text
-  const modeName = m < 0.3 ? 'Day' : m > 0.7 ? 'Night' : 'Hybrid';
-  if (engine?.started && state.power) {
-    els.statusText.textContent = `${modeName} mode • ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
-  }
-}
-
-function updatePitchUI() {
-  const pitchEl = document.getElementById('pitchValue');
-  if (pitchEl) {
-    const p = state.pitch;
-    pitchEl.textContent = p === 0 ? '0' : (p > 0 ? `+${p}` : `${p}`);
-  }
-}
-
-async function ensureEngine() {
-  if (!engine) engine = await createDayNightManEngine(state);
-}
-
-function syncAndRender() {
+async function updateEngineFromGesture() {
   saveState();
+  if (!audioInitialized) {
+    render();
+    return;
+  }
+
+  const running = await recoverAudioContext('gesture');
+  if (!running) {
+    render();
+    return;
+  }
+
+  engine.update(state);
   render();
 }
 
+function setMorphFromPointer(event) {
+  const rect = els.morphTrack.getBoundingClientRect();
+  const horizontal = window.matchMedia('(max-width: 520px)').matches;
+
+  let percent;
+  if (horizontal) {
+    percent = (event.clientX - rect.left) / rect.width;
+  } else {
+    percent = 1 - (event.clientY - rect.top) / rect.height;
+  }
+
+  state.morph = clamp(percent, 0, 1);
+  state.preset = 'Custom';
+  updateMorphUI();
+}
+
+function updateMorphUI() {
+  const morph = state.morph;
+  const horizontal = window.matchMedia('(max-width: 520px)').matches;
+  const slot = els.morphTrack.querySelector('.morph-slot');
+  const thumb = els.morphThumb;
+  const fill = els.morphFill;
+
+  const slotRect = slot.getBoundingClientRect();
+  const thumbSize = horizontal ? thumb.offsetWidth || 46 : thumb.offsetHeight || 46;
+  const travel = Math.max((horizontal ? slotRect.width : slotRect.height) - thumbSize - 8, 0);
+  const offset = 4 + morph * travel;
+
+  if (horizontal) {
+    thumb.style.left = `${offset}px`;
+    thumb.style.bottom = 'auto';
+    thumb.style.top = '50%';
+    thumb.style.transform = 'translateY(-50%)';
+    fill.style.width = `${morph * 100}%`;
+    fill.style.height = 'auto';
+  } else {
+    thumb.style.bottom = `${offset}px`;
+    thumb.style.left = '50%';
+    thumb.style.top = 'auto';
+    thumb.style.transform = 'translateX(-50%)';
+    fill.style.height = `${morph * 100}%`;
+    fill.style.width = 'auto';
+  }
+
+  const accent = mixColor([246, 168, 92], [84, 222, 232], morph);
+  const bg = mixColor([16, 18, 28], [8, 11, 18], morph);
+  const panel = mixColor([40, 35, 31], [23, 28, 36], morph);
+  const panelHi = mixColor([112, 96, 84], [84, 104, 122], morph);
+
+  setCssVar('--morph', morph.toFixed(4));
+  setCssVar('--accent-r', accent[0]);
+  setCssVar('--accent-g', accent[1]);
+  setCssVar('--accent-b', accent[2]);
+  setCssVar('--bg-r', bg[0]);
+  setCssVar('--bg-g', bg[1]);
+  setCssVar('--bg-b', bg[2]);
+  setCssVar('--panel-r', panel[0]);
+  setCssVar('--panel-g', panel[1]);
+  setCssVar('--panel-b', panel[2]);
+  setCssVar('--panel-hi-r', panelHi[0]);
+  setCssVar('--panel-hi-g', panelHi[1]);
+  setCssVar('--panel-hi-b', panelHi[2]);
+
+  const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'HYBRID';
+  els.morphMode.textContent = modeName;
+  renderStatus();
+}
+
+function updatePitchUI() {
+  const pitch = state.pitch;
+  els.pitchValue.textContent = pitch === 0 ? '0' : pitch > 0 ? `+${pitch}` : `${pitch}`;
+
+  const rotation = (pitch / 24) * 140;
+  els.pitchWheel.style.transform = `rotate(${rotation}deg)`;
+}
+
 function render() {
-  // Start button state
-  if (engine?.started) {
+  els.body.style.setProperty('--power', state.power && audioInitialized ? '1' : '0');
+
+  if (audioInitialized) {
     els.startButton.classList.add('audio-active');
-    els.startButton.textContent = state.power ? 'Play' : 'Paused';
+    els.startButton.textContent = state.power ? 'Pause synth' : 'Play synth';
   } else {
     els.startButton.classList.remove('audio-active');
     els.startButton.textContent = 'Tap to start';
   }
 
-  // Status
-  if (!engine?.started) {
-    els.statusText.textContent = 'Tap start to play';
-  } else if (!state.power) {
-    els.statusText.textContent = 'Tap to play';
+  renderStatus();
+  renderPresetButtons();
+}
+
+function renderStatus() {
+  if (!audioInitialized || !engine) {
+    els.statusText.textContent = 'Tap start to arm audio';
+    return;
   }
 
-  renderPresetButtons();
+  if (engine.context.state !== 'running') {
+    els.statusText.textContent = 'Audio suspended • tap play again';
+    return;
+  }
+
+  if (!state.power) {
+    els.statusText.textContent = 'Ready • tap play';
+    return;
+  }
+
+  const modeName = state.morph < 0.22 ? 'Day' : state.morph > 0.78 ? 'Night' : 'Hybrid';
+  els.statusText.textContent = `${modeName} morph • ${state.pitch > 0 ? '+' : ''}${state.pitch} st`;
 }
 
 function renderPresetButtons() {
@@ -389,96 +502,84 @@ function renderPresetButtons() {
       hydrateControls();
       updateMorphUI();
       updatePitchUI();
-      await ensureEngine();
-      engine.update(state);
-      syncAndRender();
+      state.preset = name;
+      await updateEngineFromGesture();
     });
     els.presetList.appendChild(button);
   }
 }
 
-// === DSP ENGINE ===
 async function createDayNightManEngine(initialState) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const context = new (window.AudioContext || window.webkitAudioContext)();
 
-  // === DAY OSCILLATORS (Lyra-8 style cluster) ===
   const dayOscs = [];
   const dayOscGains = [];
   const dayDetuneBase = [0, 3, 7, 10, 14, 17, 21, 24];
-  for (let i = 0; i < 4; i++) {
-    const osc = ctx.createOscillator();
+  for (let index = 0; index < 4; index += 1) {
+    const osc = context.createOscillator();
     osc.type = 'sine';
-    osc.detune.value = dayDetuneBase[i] + (Math.random() - 0.5) * 4;
-    const gain = ctx.createGain();
+    osc.detune.value = dayDetuneBase[index] + (Math.random() - 0.5) * 4;
+    const gain = context.createGain();
     gain.gain.value = 0;
     dayOscs.push(osc);
     dayOscGains.push(gain);
   }
 
-  const subOsc = ctx.createOscillator();
+  const subOsc = context.createOscillator();
   subOsc.type = 'sine';
-  const subGain = ctx.createGain();
+  const subGain = context.createGain();
   subGain.gain.value = 0;
 
-  // Noise layer
-  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
   const noiseData = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < noiseData.length; i++) {
-    noiseData[i] = (Math.random() * 2 - 1) * 0.015;
+  for (let index = 0; index < noiseData.length; index += 1) {
+    noiseData[index] = (Math.random() * 2 - 1) * 0.015;
   }
-  const noiseSource = ctx.createBufferSource();
+  const noiseSource = context.createBufferSource();
   noiseSource.buffer = noiseBuffer;
   noiseSource.loop = true;
-  const noiseGain = ctx.createGain();
-  const noiseFilter = ctx.createBiquadFilter();
+  const noiseGain = context.createGain();
+  const noiseFilter = context.createBiquadFilter();
   noiseFilter.type = 'bandpass';
   noiseFilter.frequency.value = 2500;
   noiseFilter.Q.value = 0.8;
 
-  // === NIGHT OSCILLATORS ===
-  const nightOsc1 = ctx.createOscillator();
-  const nightOsc2 = ctx.createOscillator();
+  const nightOsc1 = context.createOscillator();
+  const nightOsc2 = context.createOscillator();
   nightOsc1.type = 'sine';
   nightOsc2.type = 'triangle';
-  const nightGain1 = ctx.createGain();
-  const nightGain2 = ctx.createGain();
+  const nightGain1 = context.createGain();
+  const nightGain2 = context.createGain();
 
-  // === SIGNAL PATH ===
-  const preMix = ctx.createGain();
-  const filter = ctx.createBiquadFilter();
-  const shaper = ctx.createWaveShaper();
-  const dryGain = ctx.createGain();
-  
-  // Delay
-  const delay = ctx.createDelay(2.0);
-  const delayFeedback = ctx.createGain();
-  const delayWet = ctx.createGain();
-  const delayFilter = ctx.createBiquadFilter();
+  const preMix = context.createGain();
+  const filter = context.createBiquadFilter();
+  const shaper = context.createWaveShaper();
+  const dryGain = context.createGain();
+  const delay = context.createDelay(2.0);
+  const delayFeedback = context.createGain();
+  const delayWet = context.createGain();
+  const delayFilter = context.createBiquadFilter();
   delayFilter.type = 'lowpass';
   delayFilter.frequency.value = 3500;
 
-  // Reverb (delay network)
-  const revDly1 = ctx.createDelay(0.08);
-  const revDly2 = ctx.createDelay(0.13);
-  const revDly3 = ctx.createDelay(0.19);
-  const revFdbk = ctx.createGain();
-  const reverbWet = ctx.createGain();
+  const revDly1 = context.createDelay(0.08);
+  const revDly2 = context.createDelay(0.13);
+  const revDly3 = context.createDelay(0.19);
+  const revFdbk = context.createGain();
+  const reverbWet = context.createGain();
   revDly1.delayTime.value = 0.061;
   revDly2.delayTime.value = 0.107;
   revDly3.delayTime.value = 0.163;
   revFdbk.gain.value = 0.22;
 
-  const outputGain = ctx.createGain();
-  const compressor = ctx.createDynamicsCompressor();
-
-  // LFO
-  const lfo = ctx.createOscillator();
-  const lfoDepth = ctx.createGain();
+  const outputGain = context.createGain();
+  const compressor = context.createDynamicsCompressor();
+  const lfo = context.createOscillator();
+  const lfoDepth = context.createGain();
+  const filterMod = context.createGain();
   lfo.type = 'sine';
-  const filterMod = ctx.createGain();
 
-  // Wire
-  dayOscs.forEach((osc, i) => osc.connect(dayOscGains[i]).connect(preMix));
+  dayOscs.forEach((osc, index) => osc.connect(dayOscGains[index]).connect(preMix));
   subOsc.connect(subGain).connect(preMix);
   noiseSource.connect(noiseFilter).connect(noiseGain).connect(preMix);
   nightOsc1.connect(nightGain1).connect(preMix);
@@ -488,12 +589,10 @@ async function createDayNightManEngine(initialState) {
   filter.connect(shaper);
   shaper.connect(dryGain);
   shaper.connect(delay);
-  
   delay.connect(delayFilter).connect(delayWet);
   delay.connect(delayFeedback).connect(delay);
   delayFeedback.gain.value = 0.35;
 
-  // Reverb wiring
   shaper.connect(revDly1).connect(reverbWet);
   shaper.connect(revDly2).connect(reverbWet);
   shaper.connect(revDly3).connect(reverbWet);
@@ -505,14 +604,12 @@ async function createDayNightManEngine(initialState) {
   delayWet.connect(outputGain);
   reverbWet.connect(outputGain);
   outputGain.connect(compressor);
-  compressor.connect(ctx.destination);
+  compressor.connect(context.destination);
 
-  // LFO modulation
   lfo.connect(lfoDepth).connect(filterMod.gain);
   filterMod.connect(filter.detune);
 
-  // Start
-  dayOscs.forEach(osc => osc.start());
+  dayOscs.forEach((osc) => osc.start());
   subOsc.start();
   noiseSource.start();
   nightOsc1.start();
@@ -520,22 +617,22 @@ async function createDayNightManEngine(initialState) {
   lfo.start();
 
   const api = {
+    context,
     started: false,
     async start() {
-      if (ctx.state === 'suspended') await ctx.resume();
-      this.started = true;
+      if (context.state === 'suspended') await context.resume();
+      this.started = context.state === 'running';
+      return this.started;
     },
     update(next) {
       const power = next.power ? 1 : 0;
-      const morph = next.morph !== undefined ? next.morph : (next.mode === 'night' ? 1 : 0);
+      const morph = clamp(next.morph ?? 0, 0, 1);
       const pitch = next.pitch;
       const baseNote = 48 + pitch;
       const baseHz = midiToHz(baseNote);
-
-      // Blended parameters based on morph
       const dayWeight = 1 - morph;
       const nightWeight = morph;
-      
+
       const bite = next.bite / 100;
       const heat = next.heat / 100;
       const edge = next.edge / 100;
@@ -544,73 +641,57 @@ async function createDayNightManEngine(initialState) {
       const drift = next.drift / 100;
       const space = next.space / 100;
 
-      // === DAY (Lyra-8 inspired) ===
-      const dayDetune = bite * 30;
-      dayOscs.forEach((osc, i) => {
-        const baseD = dayDetuneBase[i] * dayDetune / 20;
-        osc.detune.setTargetAtTime(baseD, ctx.currentTime, 0.05);
+      const dayDetune = 8 + bite * 38;
+      dayOscs.forEach((osc, index) => {
+        const baseDetune = dayDetuneBase[index] * dayDetune / 20;
+        osc.detune.setTargetAtTime(baseDetune, context.currentTime, 0.05);
       });
-      dayOscs[0].frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
-      dayOscs[1].frequency.setTargetAtTime(baseHz * 1.003, ctx.currentTime, 0.05);
-      dayOscs[2].frequency.setTargetAtTime(baseHz * 1.007, ctx.currentTime, 0.05);
-      dayOscs[3].frequency.setTargetAtTime(baseHz * 1.012, ctx.currentTime, 0.05);
+      dayOscs[0].frequency.setTargetAtTime(baseHz, context.currentTime, 0.05);
+      dayOscs[1].frequency.setTargetAtTime(baseHz * 1.003, context.currentTime, 0.05);
+      dayOscs[2].frequency.setTargetAtTime(baseHz * 1.007, context.currentTime, 0.05);
+      dayOscs[3].frequency.setTargetAtTime(baseHz * 1.012, context.currentTime, 0.05);
 
-      dayOscGains.forEach((g, i) => {
-        g.gain.setTargetAtTime((0.22 - i * 0.03) * dayWeight * 0.8, ctx.currentTime, 0.08);
+      dayOscGains.forEach((gain, index) => {
+        gain.gain.setTargetAtTime((0.22 - index * 0.03) * dayWeight * 0.82, context.currentTime, 0.08);
       });
 
-      // Day noise
-      noiseGain.gain.setTargetAtTime(bite * 0.012 * dayWeight, ctx.currentTime, 0.05);
-      noiseFilter.frequency.setTargetAtTime(1800 + bite * 2200, ctx.currentTime, 0.05);
+      noiseGain.gain.setTargetAtTime((0.002 + bite * 0.014) * dayWeight, context.currentTime, 0.05);
+      noiseFilter.frequency.setTargetAtTime(1600 + bite * 2800 - morph * 700, context.currentTime, 0.05);
 
-      // === NIGHT (Audra-2 inspired) ===
-      nightOsc1.frequency.setTargetAtTime(baseHz * 0.998, ctx.currentTime, 0.05);
-      nightOsc2.frequency.setTargetAtTime(baseHz * 1.002, ctx.currentTime, 0.05);
-      nightGain1.gain.setTargetAtTime(0.3 * nightWeight, ctx.currentTime, 0.08);
-      nightGain2.gain.setTargetAtTime((0.2 + haze * 0.2) * nightWeight, ctx.currentTime, 0.08);
+      nightOsc1.frequency.setTargetAtTime(baseHz * (0.996 + morph * 0.003), context.currentTime, 0.05);
+      nightOsc2.frequency.setTargetAtTime(baseHz * (1.004 - morph * 0.002), context.currentTime, 0.05);
+      nightGain1.gain.setTargetAtTime((0.08 + 0.28 * nightWeight) * (0.8 + haze * 0.4), context.currentTime, 0.08);
+      nightGain2.gain.setTargetAtTime((0.05 + 0.24 * nightWeight) * (0.6 + haze * 0.8), context.currentTime, 0.08);
 
-      // === SHARED FILTER ===
-      const dayFilterFreq = 600 + bite * 2400;
-      const nightFilterFreq = 200 + haze * 1600;
-      const filterFreq = dayFilterFreq * dayWeight + nightFilterFreq * nightWeight;
-      
-      filter.type = morph > 0.5 ? 'lowpass' : 'bandpass';
-      filter.frequency.setTargetAtTime(clamp(filterFreq, 150, 2800), ctx.currentTime, 0.05);
-      filter.Q.setTargetAtTime(0.6 + morph * 2 + (morph < 0.5 ? heat * 1.5 : drift * 2), ctx.currentTime, 0.05);
+      const filterFreq =
+        320 +
+        dayWeight * (980 + bite * 2200) +
+        nightWeight * (140 + haze * 1350) +
+        (1 - Math.abs(morph - 0.5) * 2) * 160;
+      filter.type = morph > 0.66 ? 'lowpass' : morph < 0.34 ? 'bandpass' : 'peaking';
+      filter.frequency.setTargetAtTime(clamp(filterFreq, 120, 3400), context.currentTime, 0.05);
+      filter.Q.setTargetAtTime(0.7 + heat * dayWeight * 1.9 + drift * nightWeight * 2.4 + morph * 0.6, context.currentTime, 0.05);
 
-      // === LFO ===
-      const dayPulse = 0.08 + pulse * 1.4;
-      const nightPulse = 0.02 + pulse * 0.28;
-      lfo.frequency.setTargetAtTime(dayPulse * dayWeight + nightPulse * nightWeight, ctx.currentTime, 0.05);
-      
-      const dayDepth = 0.15 + edge * 0.35;
-      const nightDepth = 0.1 + drift * 0.3;
-      lfoDepth.gain.setTargetAtTime(dayDepth * dayWeight + nightDepth * nightWeight, ctx.currentTime, 0.05);
-      filterMod.gain.setTargetAtTime(60 * edge * dayWeight + 180 * drift * nightWeight, ctx.currentTime, 0.05);
+      const lfoRate = (0.08 + pulse * 1.35) * dayWeight + (0.03 + pulse * 0.22 + drift * 0.18) * nightWeight;
+      lfo.frequency.setTargetAtTime(lfoRate, context.currentTime, 0.05);
+      lfoDepth.gain.setTargetAtTime(0.12 + edge * dayWeight * 0.34 + drift * nightWeight * 0.32, context.currentTime, 0.05);
+      filterMod.gain.setTargetAtTime(40 * edge * dayWeight + 180 * drift * nightWeight + morph * 45, context.currentTime, 0.05);
 
-      // === SPACE ===
-      const daySpace = 0.05 + space * 0.35 * dayWeight;
-      const nightSpace = 0.15 + space * 0.55 * nightWeight;
-      const totalSpace = daySpace + nightSpace;
-      
-      delayWet.gain.setTargetAtTime(totalSpace * 0.5, ctx.currentTime, 0.05);
-      dryGain.gain.setTargetAtTime(1 - totalSpace * 0.4, ctx.currentTime, 0.05);
-      delay.delayTime.setTargetAtTime(0.2 + space * 0.7, ctx.currentTime, 0.05);
-      delayFeedback.gain.setTargetAtTime(0.1 + space * 0.45, ctx.currentTime, 0.05);
-      reverbWet.gain.setTargetAtTime(totalSpace * 0.08, ctx.currentTime, 0.05);
+      const spaceBlend = 0.06 + dayWeight * space * 0.28 + nightWeight * (0.12 + space * 0.48);
+      delayWet.gain.setTargetAtTime(spaceBlend * 0.48, context.currentTime, 0.05);
+      dryGain.gain.setTargetAtTime(1 - spaceBlend * 0.44, context.currentTime, 0.05);
+      delay.delayTime.setTargetAtTime(0.14 + space * 0.62 + morph * 0.08, context.currentTime, 0.05);
+      delayFeedback.gain.setTargetAtTime(0.1 + space * 0.44 + morph * 0.08, context.currentTime, 0.05);
+      delayFilter.frequency.setTargetAtTime(2200 + dayWeight * 1200 + nightWeight * 400, context.currentTime, 0.05);
+      reverbWet.gain.setTargetAtTime(spaceBlend * (0.05 + 0.06 * nightWeight), context.currentTime, 0.05);
 
-      // === DRIVE ===
-      const dayDrive = 1 + heat * 2;
-      const nightDrive = 1 + haze * 0.6;
-      const totalDrive = dayDrive * dayWeight + nightDrive * nightWeight;
-      shaper.curve = makeDriveCurve(totalDrive * 8);
+      const drive = (1.2 + heat * 2.3) * dayWeight + (1 + haze * 0.9 + drift * 0.2) * nightWeight;
+      shaper.curve = makeDriveCurve(drive * 7.5);
 
-      // === SUB ===
-      subOsc.frequency.setTargetAtTime(baseHz * 0.5, ctx.currentTime, 0.05);
-      subGain.gain.setTargetAtTime((0.1 + bite * 0.08) * dayWeight + (0.25 + haze * 0.15) * nightWeight, ctx.currentTime, 0.05);
+      subOsc.frequency.setTargetAtTime(baseHz * 0.5, context.currentTime, 0.05);
+      subGain.gain.setTargetAtTime((0.09 + bite * 0.08) * dayWeight + (0.16 + haze * 0.24) * nightWeight, context.currentTime, 0.05);
 
-      // === OUTPUT ===
-      outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.25, ctx.currentTime, 0.05);
+      outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.25, context.currentTime, 0.05);
     }
   };
 
@@ -618,7 +699,18 @@ async function createDayNightManEngine(initialState) {
   return api;
 }
 
-// === UTILS ===
+function mixColor(a, b, t) {
+  return a.map((value, index) => Math.round(value + (b[index] - value) * t));
+}
+
+function setCssVar(name, value) {
+  els.body.style.setProperty(name, `${value}`);
+}
+
+function getAngle(cx, cy, x, y) {
+  return Math.atan2(y - cy, x - cx) * (180 / Math.PI);
+}
+
 function midiToHz(note) {
   return 440 * Math.pow(2, (note - 69) / 12);
 }
@@ -627,23 +719,21 @@ function dbToGain(db) {
   return Math.pow(10, db / 20);
 }
 
-function clamp(v, min, max) {
-  return Math.min(max, Math.max(min, v));
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
 function makeDriveCurve(amount) {
   const samples = 44100;
   const curve = new Float32Array(samples);
-  for (let i = 0; i < samples; i++) {
-    const x = (i * 2) / samples - 1;
-    curve[i] = Math.tanh(x * amount);
+  for (let index = 0; index < samples; index += 1) {
+    const x = (index * 2) / samples - 1;
+    curve[index] = Math.tanh(x * amount);
   }
   return curve;
 }
 
-const triggerHaptic = (type = 'light') => {
-  if (navigator.vibrate) {
-    const duration = type === 'medium' ? 25 : 10;
-    navigator.vibrate(duration);
-  }
-};
+function triggerHaptic(type = 'light') {
+  if (!navigator.vibrate) return;
+  navigator.vibrate(type === 'medium' ? 22 : 10);
+}
