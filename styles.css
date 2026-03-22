@@ -455,10 +455,10 @@ h1 {
 }
 
 .hero-bay {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
+  align-items: center;
+  gap: 12px;
   background:
     radial-gradient(circle at 50% 22%, rgba(255,255,255,0.07), transparent 38%),
     linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.18) 22%, rgba(0,0,0,0.35));
@@ -488,8 +488,8 @@ h1 {
 
 .trackball-pocket {
   position: relative;
-  width: 148px;
-  height: 148px;
+  width: 126px;
+  height: 126px;
   margin: 0 auto;
   display: grid;
   place-items: center;
@@ -512,8 +512,8 @@ h1 {
 
 .pitch-wheel {
   position: relative;
-  width: 118px;
-  height: 118px;
+  width: 98px;
+  height: 98px;
   border: 0;
   border-radius: 50%;
   cursor: grab;
@@ -555,7 +555,7 @@ h1 {
 
 .pitch-wheel-inner {
   position: absolute;
-  inset: 38px;
+  inset: 31px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 34%, rgba(255,255,255,0.16), rgba(26,26,28,0.96));
   border: 1px solid rgba(255,255,255,0.08);
@@ -565,8 +565,8 @@ h1 {
   display: inline-flex;
   align-self: center;
   justify-content: center;
-  min-width: 70px;
-  padding: 6px 10px;
+  min-width: 62px;
+  padding: 5px 9px;
   border-radius: 999px;
   background: rgba(0,0,0,0.24);
   color: var(--accent);
@@ -578,7 +578,8 @@ h1 {
 .morph-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .morph-state {
@@ -592,9 +593,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 240px;
-  padding: 12px 8px 8px;
+  gap: 8px;
+  min-height: 164px;
+  padding: 4px 2px 2px;
   border: none;
   background: transparent;
   cursor: ns-resize;
@@ -605,7 +606,7 @@ h1 {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  height: 200px;
+  height: 148px;
   font-size: 0.5rem;
   color: rgba(230, 220, 207, 0.52);
   letter-spacing: 0.18em;
@@ -616,8 +617,8 @@ h1 {
 
 .morph-slot {
   position: relative;
-  width: 40px;
-  height: 200px;
+  width: 34px;
+  height: 148px;
   border-radius: 999px;
   background:
     linear-gradient(180deg,
@@ -774,6 +775,7 @@ h1 {
 
   .hero-bay {
     order: 2;
+    grid-template-columns: 1fr;
   }
 
   .space-well {
@@ -810,13 +812,13 @@ h1 {
   }
 
   .trackball-pocket {
-    width: 132px;
-    height: 132px;
+    width: 118px;
+    height: 118px;
   }
 
   .pitch-wheel {
-    width: 106px;
-    height: 106px;
+    width: 92px;
+    height: 92px;
   }
 
   .morph-track {
