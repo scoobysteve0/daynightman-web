@@ -80,17 +80,38 @@ function hydrateControls() {
 }
 
 function bindEvents() {
+  // Track audio initialization to prevent double-init
+  let audioInitialized = false;
+  let audioInitPromise = null;
+
   // Tap-to-start: ensure AudioContext is running (required for mobile)
   const initAudio = async () => {
-    if (!engine) engine = await createDayNightManEngine(state);
-    await engine.start();
-    // Auto-enable power on first tap for cleaner mobile UX
-    if (!state.power) {
-      state.power = true;
-      state.preset = 'Custom';
-    }
-    engine.update(state);
-    render();
+    if (audioInitPromise) return audioInitPromise;
+
+    audioInitPromise = (async () => {
+      try {
+        els.statusText.textContent = 'Starting audio...';
+        if (!engine) engine = await createDayNightManEngine(state);
+        await engine.start();
+
+        // Auto-enable power on first tap for cleaner mobile UX
+        if (!state.power) {
+          state.power = true;
+          state.preset = 'Custom';
+        }
+        engine.update(state);
+        audioInitialized = true;
+        render();
+        els.statusText.textContent = 'Audio ready! Turn on Power to play.';
+      } catch (error) {
+        console.error('Audio init failed:', error);
+        els.statusText.textContent = `Audio failed: ${error.message}`;
+        audioInitialized = false;
+        audioInitPromise = null;
+      }
+    })();
+
+    return audioInitPromise;
   };
 
   // Haptic feedback helper for mobile
@@ -101,9 +122,22 @@ function bindEvents() {
     }
   };
 
-  // Use touchstart for faster mobile response + click fallback
+  // Single tap handler - works on both mobile and desktop
+  // Use click only - mobile browsers handle this correctly with e.preventDefault on touch
   const startHandler = async (e) => {
+    // Prevent double-tap zoom on mobile
     e.preventDefault();
+    e.stopPropagation();
+
+    if (audioInitialized) {
+      // Already initialized, just toggle power
+      state.power = !state.power;
+      state.preset = 'Custom';
+      if (engine) engine.update(state);
+      syncAndRender();
+      return;
+    }
+
     try {
       triggerHaptic('medium');
       await initAudio();
@@ -111,7 +145,9 @@ function bindEvents() {
       els.statusText.textContent = `Could not start audio: ${error.message}`;
     }
   };
-  els.startButton.addEventListener('touchstart', startHandler, { passive: false });
+
+  // Use click only - more reliable across browsers
+  // The click event fires after touch on mobile, which is fine since we check audioInitialized
   els.startButton.addEventListener('click', startHandler);
 
   // Power/mode buttons get touch handling for faster mobile response.
@@ -260,10 +296,11 @@ function render() {
     els.startButton.textContent = 'Tap to start audio';
   }
 
+  // Status text - always guide user to start
   if (!engine?.started) {
-    els.statusText.textContent = 'Audio is stopped. On iPhone, tap the start button first.';
+    els.statusText.textContent = 'Tap the button above to start audio';
   } else if (!state.power) {
-    els.statusText.textContent = 'Audio engine is live, but Power is off.';
+    els.statusText.textContent = 'Audio ready. Turn on Power to play.';
   } else {
     const shadeNote = state.shade ? ' [Shade active]' : '';
     els.statusText.textContent = `${state.mode === 'day' ? 'Dayman' : 'Nightman'} running. Preset: ${state.preset}.${shadeNote}`;
