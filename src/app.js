@@ -1,3 +1,14 @@
+// === CONTROL MAPPING DOCUMENTATION ===
+// pitch: Pitch offset in semitones (-24 to +24)
+// bite: (Dayman) Aggression, filter brightness, harmonic content
+// heat: (Dayman) Saturation, drive intensity
+// edge: (Dayman) LFO speed, rhythmic movement, delay mix
+// haze: (Nightman) Filter softness, blur amount
+// drift: (Nightman) Filter movement, LFO depth
+// space: (Nightman) Wet/dry, delay time, reverb width
+// output: Master volume in dB
+// === END CONTROL MAPPING ===
+
 const defaults = {
   power: false,
   mode: 'day',
@@ -64,15 +75,47 @@ function hydrateControls() {
 }
 
 function bindEvents() {
-  els.startButton.addEventListener('click', async () => {
+  // Tap-to-start: ensure AudioContext is running (required for mobile)
+  const initAudio = async () => {
+    if (!engine) engine = await createDayNightManEngine(state);
+    await engine.start();
+    // Auto-enable power on first tap for cleaner mobile UX
+    if (!state.power) {
+      state.power = true;
+      state.preset = 'Custom';
+    }
+    engine.update(state);
+    render();
+  };
+
+  // Haptic feedback helper for mobile
+  const triggerHaptic = (type = 'light') => {
+    if (navigator.vibrate) {
+      const duration = type === 'medium' ? 30 : 10;
+      navigator.vibrate(duration);
+    }
+  };
+
+  // Use touchstart for faster mobile response + click fallback
+  const startHandler = async (e) => {
+    e.preventDefault();
     try {
-      if (!engine) engine = await createDayNightManEngine(state);
-      await engine.start();
-      engine.update(state);
-      render();
+      triggerHaptic('medium');
+      await initAudio();
     } catch (error) {
       els.statusText.textContent = `Could not start audio: ${error.message}`;
     }
+  };
+  els.startButton.addEventListener('touchstart', startHandler, { passive: false });
+  els.startButton.addEventListener('click', startHandler);
+
+  // Power/mode buttons also get touch handling
+  ['powerButton', 'modeButton'].forEach(id => {
+    const btn = els[id];
+    btn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      btn.click();
+    }, { passive: false });
   });
 
   els.copyLinkButton.addEventListener('click', async () => {
@@ -132,6 +175,15 @@ function render() {
   els.powerButton.classList.toggle('active', state.power);
   els.modeButton.classList.toggle('active', state.mode === 'night');
 
+  // Visual feedback: start button shows audio state
+  if (engine?.started) {
+    els.startButton.classList.add('audio-active');
+    els.startButton.textContent = state.power ? '🔊 Playing' : '⏸ Paused';
+  } else {
+    els.startButton.classList.remove('audio-active');
+    els.startButton.textContent = 'Tap to start audio';
+  }
+
   if (!engine?.started) {
     els.statusText.textContent = 'Audio is stopped. On iPhone, tap the start button first.';
   } else if (!state.power) {
@@ -160,23 +212,38 @@ function renderPresetButtons() {
   }
 }
 
+// Enhanced DSP engine with stronger Dayman vs Nightman contrast
 async function createDayNightManEngine(initialState) {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
 
+  // Main oscillators
   const osc1 = ctx.createOscillator();
   const osc2 = ctx.createOscillator();
   const osc1Gain = ctx.createGain();
   const osc2Gain = ctx.createGain();
+
+  // Sub oscillator for depth
+  const subOsc = ctx.createOscillator();
+  const subGain = ctx.createGain();
+
+  // Pre-processing mix
   const preMix = ctx.createGain();
   const preFilterGain = ctx.createGain();
+
+  // Filter stage - key for timbral shaping
   const filter = ctx.createBiquadFilter();
+
+  // Waveshaper for saturation/drive
   const shaper = ctx.createWaveShaper();
+
+  // Delay/reverb section for space
   const wetGain = ctx.createGain();
   const dryGain = ctx.createGain();
   const feedbackGain = ctx.createGain();
-  const delay = ctx.createDelay(2.2);
-  const outputGain = ctx.createGain();
+  const delay = ctx.createDelay(2.0);
+  const delayFilter = ctx.createBiquadFilter();
 
+  // LFO for movement
   const lfo = ctx.createOscillator();
   const lfoDepth = ctx.createGain();
   const lfoBias = ctx.createConstantSource();
@@ -184,37 +251,64 @@ async function createDayNightManEngine(initialState) {
   const driftGain = ctx.createGain();
   const motionSum = ctx.createGain();
 
+  // Master output
+  const outputGain = ctx.createGain();
+  const compressor = ctx.createDynamicsCompressor();
+
+  // Initial routing
   osc1.type = 'sine';
   osc2.type = 'sawtooth';
-  osc1Gain.gain.value = 0.54;
-  osc2Gain.gain.value = 0.46;
+  subOsc.type = 'sine';
+  subOsc.frequency.value = 0.5; // octave below
+
+  osc1Gain.gain.value = 0.5;
+  osc2Gain.gain.value = 0.35;
+  subGain.gain.value = 0.15;
+
   preMix.gain.value = 1;
   preFilterGain.gain.value = 1;
-  wetGain.gain.value = 0.2;
-  dryGain.gain.value = 0.8;
-  feedbackGain.gain.value = 0.2;
-  outputGain.gain.value = 0;
 
   filter.type = 'highpass';
+  filter.Q.value = 1;
+
+  wetGain.gain.value = 0.15;
+  dryGain.gain.value = 0.85;
+  feedbackGain.gain.value = 0.25;
+  delay.delayTime.value = 0.3;
+  delayFilter.type = 'lowpass';
+  delayFilter.frequency.value = 3000;
+
   lfo.type = 'sine';
   lfo.frequency.value = 0.5;
-  lfoDepth.gain.value = 0.25;
+  lfoDepth.gain.value = 0.2;
   lfoBias.offset.value = 0.5;
 
+  outputGain.gain.value = 0;
+  compressor.threshold.value = -12;
+  compressor.knee.value = 10;
+  compressor.ratio.value = 4;
+
+  // Connect audio graph
   osc1.connect(osc1Gain).connect(preMix);
   osc2.connect(osc2Gain).connect(preMix);
+  subOsc.connect(subGain).connect(preMix);
+
   preMix.connect(preFilterGain);
   preFilterGain.connect(filter);
   preFilterGain.connect(dryGain);
+
   filter.connect(shaper);
   shaper.connect(wetGain);
   shaper.connect(delay);
-  delay.connect(wetGain);
+  delay.connect(delayFilter).connect(wetGain);
   delay.connect(feedbackGain).connect(delay);
+
   dryGain.connect(outputGain);
   wetGain.connect(outputGain);
-  outputGain.connect(ctx.destination);
+  outputGain.connect(compressor);
+  compressor.connect(ctx.destination);
 
+  // LFO modulation routing
   lfo.connect(lfoDepth).connect(motionSum);
   lfoBias.connect(motionSum);
   motionSum.connect(edgeGain.gain);
@@ -227,6 +321,7 @@ async function createDayNightManEngine(initialState) {
 
   osc1.start();
   osc2.start();
+  subOsc.start();
 
   const api = {
     started: false,
@@ -236,39 +331,88 @@ async function createDayNightManEngine(initialState) {
     },
     update(next) {
       const power = next.power ? 1 : 0;
-      const bite = next.bite / 100;
-      const heat = next.heat / 100;
-      const edge = next.edge / 100;
-      const haze = next.haze / 100;
-      const drift = next.drift / 100;
-      const space = next.space / 100;
+      const bite = next.bite / 100;      // Day: aggression, grit
+      const heat = next.heat / 100;      // Saturation, drive
+      const edge = next.edge / 100;       // Day: harmonic content
+      const haze = next.haze / 100;      // Night: softness, blur
+      const drift = next.drift / 100;    // Filter movement amount
+      const space = next.space / 100;    // Wet/dry, width
       const night = next.mode === 'night';
 
-      const baseHz = midiToHz(48 + next.pitch);
-      const osc2Hz = baseHz * (night ? (1.0025 + haze * 0.025) : (1.45 + bite * 1.15));
-      osc1.frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.03);
-      osc2.frequency.setTargetAtTime(osc2Hz, ctx.currentTime, 0.03);
+      // Base pitch
+      const baseNote = 48 + next.pitch;
+      const baseHz = midiToHz(baseNote);
 
-      osc2.type = night ? 'triangle' : 'sawtooth';
-      filter.type = night ? 'lowpass' : 'highpass';
-      filter.frequency.setTargetAtTime(night ? mapRange(haze, 90, 1600) : mapRange(bite, 1000, 6800), ctx.currentTime, 0.04);
-      filter.Q.setTargetAtTime(night ? mapRange(space, 2.5, 10) : mapRange(heat, 3.5, 8.5), ctx.currentTime, 0.04);
+      // === DAYMAN vs NIGHTMAN TIMBRE CONTRAST ===
+      if (night) {
+        // NIGHTMAN: darker, wider, hazier, ambient
+        osc2.type = 'triangle';
+        filter.type = 'lowpass';
 
-      lfo.frequency.setTargetAtTime(night ? mapRange(drift, 0.025, 0.18) : mapRange(edge, 0.12, 1.2), ctx.currentTime, 0.04);
-      lfoDepth.gain.setTargetAtTime(night ? (0.18 + drift * 0.22) : (0.22 + edge * 0.32), ctx.currentTime, 0.04);
-      edgeGain.gain.setTargetAtTime(night ? 0 : (20 + edge * 180), ctx.currentTime, 0.04);
-      driftGain.gain.setTargetAtTime(night ? (40 + drift * 240) : (8 + edge * 24), ctx.currentTime, 0.04);
+        // Filter opens with haze (darker base, opens up with more haze)
+        const nightFilterFreq = mapRange(haze, 150, 2200);
+        filter.frequency.setTargetAtTime(nightFilterFreq, ctx.currentTime, 0.05);
+        filter.Q.setTargetAtTime(mapRange(space, 0.5, 8), ctx.currentTime, 0.05);
 
-      const wet = clamp(night ? space * 0.68 : space * 0.3, 0, 0.75);
-      wetGain.gain.setTargetAtTime(wet, ctx.currentTime, 0.04);
-      dryGain.gain.setTargetAtTime(1 - wet, ctx.currentTime, 0.04);
-      delay.delayTime.setTargetAtTime(night ? (0.32 + space * 0.22) : (0.08 + edge * 0.12), ctx.currentTime, 0.04);
-      feedbackGain.gain.setTargetAtTime(night ? (0.18 + 0.52 * space) : (0.08 + 0.22 * edge), ctx.currentTime, 0.04);
+        // Sub oscillator prominent in night
+        subGain.gain.setTargetAtTime(0.25 + haze * 0.2, ctx.currentTime, 0.05);
+        osc2.frequency.setTargetAtTime(baseHz * 1.002, ctx.currentTime, 0.05);
+        osc1.frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
 
-      const drive = night ? (1 + haze * 1.0) : (1.7 + 2.8 * heat);
-      shaper.curve = makeDriveCurve(drive * (night ? 18 : 26));
-      preFilterGain.gain.setTargetAtTime(night ? (0.62 + 0.18 * drift) : (0.8 + 0.2 * heat), ctx.currentTime, 0.04);
-      outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.32, ctx.currentTime, 0.05);
+        // LFO slower, more ambient in night
+        lfo.frequency.setTargetAtTime(mapRange(drift, 0.03, 0.25), ctx.currentTime, 0.05);
+        lfoDepth.gain.setTargetAtTime(0.15 + drift * 0.3, ctx.currentTime, 0.05);
+        driftGain.gain.setTargetAtTime(drift * 150, ctx.currentTime, 0.05);
+        edgeGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05); // no edge in night
+
+        // More space/wet in night
+        const nightWet = mapRange(space, 0.1, 0.65);
+        wetGain.gain.setTargetAtTime(nightWet, ctx.currentTime, 0.05);
+        dryGain.gain.setTargetAtTime(1 - nightWet, ctx.currentTime, 0.05);
+        delay.delayTime.setTargetAtTime(mapRange(space, 0.2, 0.8), ctx.currentTime, 0.05);
+        feedbackGain.gain.setTargetAtTime(mapRange(space, 0.1, 0.6), ctx.currentTime, 0.05);
+
+        // Softer drive in night
+        const nightDrive = 1 + haze * 0.8;
+        shaper.curve = makeDriveCurve(nightDrive * 12);
+        preFilterGain.gain.setTargetAtTime(0.7 + drift * 0.15, ctx.currentTime, 0.05);
+
+      } else {
+        // DAYMAN: brighter, tighter, more aggressive
+        osc2.type = 'sawtooth';
+        filter.type = 'highpass';
+
+        // Filter opens with bite (brighter base, more responsive)
+        const dayFilterFreq = mapRange(bite, 800, 7500);
+        filter.frequency.setTargetAtTime(dayFilterFreq, ctx.currentTime, 0.05);
+        filter.Q.setTargetAtTime(mapRange(heat, 1, 9), ctx.currentTime, 0.05);
+
+        // Sub less prominent in day
+        subGain.gain.setTargetAtTime(0.08 + bite * 0.1, ctx.currentTime, 0.05);
+        osc2.frequency.setTargetAtTime(baseHz * (1.5 + bite * 1.0), ctx.currentTime, 0.05);
+        osc1.frequency.setTargetAtTime(baseHz, ctx.currentTime, 0.05);
+
+        // LFO faster, more rhythmic in day
+        lfo.frequency.setTargetAtTime(mapRange(edge, 0.15, 1.8), ctx.currentTime, 0.05);
+        lfoDepth.gain.setTargetAtTime(0.2 + edge * 0.4, ctx.currentTime, 0.05);
+        edgeGain.gain.setTargetAtTime(edge * 120, ctx.currentTime, 0.05);
+        driftGain.gain.setTargetAtTime(drift * 40, ctx.currentTime, 0.05);
+
+        // Less space/wet in day (tighter)
+        const dayWet = mapRange(space, 0.05, 0.35);
+        wetGain.gain.setTargetAtTime(dayWet, ctx.currentTime, 0.05);
+        dryGain.gain.setTargetAtTime(1 - dayWet, ctx.currentTime, 0.05);
+        delay.delayTime.setTargetAtTime(mapRange(edge, 0.06, 0.2), ctx.currentTime, 0.05);
+        feedbackGain.gain.setTargetAtTime(mapRange(edge, 0.05, 0.3), ctx.currentTime, 0.05);
+
+        // Stronger drive in day
+        const dayDrive = 1 + heat * 2.5;
+        shaper.curve = makeDriveCurve(dayDrive * 22);
+        preFilterGain.gain.setTargetAtTime(0.75 + heat * 0.2, ctx.currentTime, 0.05);
+      }
+
+      // Output level with soft knee
+      outputGain.gain.setTargetAtTime(dbToGain(next.output) * power * 0.28, ctx.currentTime, 0.05);
     }
   };
 
