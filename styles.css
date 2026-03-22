@@ -1,130 +1,366 @@
+/* === DayNightMan - Modular Morph UI === */
 :root {
   color-scheme: dark;
-  --bg: #0b1020;
-  --card: rgba(17, 24, 39, 0.82);
-  --card-border: rgba(148, 163, 184, 0.16);
-  --text: #f8fafc;
-  --muted: #cbd5e1;
-  --accent: #8b5cf6;
-  --accent-2: #22d3ee;
-  --success: #34d399;
-  --shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --bg: #0a0c14;
+  --bg-day: #0d0f18;
+  --bg-night: #08060c;
+  --card: rgba(18, 22, 32, 0.88);
+  --card-border: rgba(90, 80, 70, 0.2);
+  --text: #e8e4dc;
+  --muted: #8a8578;
+  --accent-day: #f59e0b;
+  --accent-night: #06b6d4;
+  --accent: var(--accent-day);
+  --knob-metal: #3a3a3a;
+  --knob-dark: #1a1a1a;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+/* Morph-dependent theming */
+body {
+  --morph: 0;
+  margin: 0;
+  min-height: 100vh;
+  background: 
+    radial-gradient(circle at 30% 0%, 
+      rgba(245, 158, 11, calc(0.15 * (1 - var(--morph)))) transparent 40%),
+    radial-gradient(circle at 70% 100%, 
+      rgba(6, 182, 212, calc(0.15 * var(--morph)))) transparent 40%),
+    var(--bg);
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.5s ease;
+}
+body.night-mode {
+  --morph: 1;
+  --accent: var(--accent-night);
 }
 
 * { box-sizing: border-box; }
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top, rgba(139, 92, 246, 0.3), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.22), transparent 24%),
+  background: 
+    radial-gradient(ellipse at top left, rgba(245, 158, 11, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
     var(--bg);
   color: var(--text);
 }
+
 .app-shell {
-  width: min(100%, 760px);
+  width: min(100%, 600px);
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  padding: max(16px, env(safe-area-inset-top)) 12px max(28px, env(safe-area-inset-bottom));
 }
-.hero { padding: 8px 4px 20px; }
+
+.hero { padding: 4px 0 16px; text-align: center; }
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 0.75rem;
-  color: var(--accent-2);
+  letter-spacing: 0.25em;
+  font-size: 0.65rem;
+  color: var(--muted);
 }
-h1, h2 { margin: 0; }
-h1 { font-size: clamp(2rem, 7vw, 3.5rem); line-height: 0.95; }
-.subcopy, .status, .note-card p { color: var(--muted); line-height: 1.5; }
+h1 { margin: 0; font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 400; letter-spacing: 0.02em; }
+.subcopy { color: var(--muted); font-size: 0.8rem; margin: 6px 0 0; line-height: 1.4; }
+
 .card {
   background: var(--card);
   border: 1px solid var(--card-border);
-  backdrop-filter: blur(16px);
-  border-radius: 22px;
-  padding: 18px;
-  box-shadow: var(--shadow);
-  margin-bottom: 16px;
-}
-.primary-card { display: grid; gap: 12px; }
-.start-button, .secondary-button, .preset-button {
-  border: 0;
+  backdrop-filter: blur(12px);
   border-radius: 16px;
-  font-weight: 700;
-  cursor: pointer;
+  padding: 14px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
 }
+
+/* === Start Button === */
 .start-button {
-  padding: 18px;
-  font-size: 1rem;
-  color: white;
-  background: linear-gradient(135deg, var(--accent), #6366f1);
+  width: 100%;
+  padding: 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 .start-button.audio-active {
   background: linear-gradient(135deg, #10b981, #059669);
-  animation: pulse 2s ease-in-out infinite;
 }
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+.status {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 8px 0 0;
 }
-.secondary-button, .preset-button {
-  padding: 10px 12px;
-  color: var(--text);
-  background: rgba(148, 163, 184, 0.12);
-}
-.secondary-button.active { background: rgba(52, 211, 153, 0.18); color: #d1fae5; }
 
-/* Shade button - gradual red over 5 seconds */
-#shadeButton {
-  transition: background-color 5s ease, color 5s ease, box-shadow 5s ease;
-  --shade-intensity: 0;
-}
-#shadeButton.shade-active {
-  background: linear-gradient(135deg, rgba(220, 38, 38, var(--shade-intensity, 0.5)), rgba(180, 30, 30, var(--shade-intensity, 0.5))) !important;
-  color: #fff !important;
-  box-shadow: 0 0 calc(15px * var(--shade-intensity, 0.5)) rgba(220, 38, 38, calc(0.4 * var(--shade-intensity, 0.5)));
-}
-.toggle-control button {
-  width: 100%;
-  justify-self: start;
-}
-.pill-row, .preset-list { display: flex; gap: 10px; flex-wrap: wrap; }
-.pill {
-  border: 1px solid rgba(52, 211, 153, 0.32);
-  color: #d1fae5;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 0.85rem;
-}
-.section-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.grid { display: grid; gap: 14px; }
-.two-up { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
-.control {
+/* === Controls Grid === */
+.controls-grid {
   display: grid;
+  grid-template-columns: 1fr 100px;
+  gap: 16px;
+}
+
+.knob-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.knob-row {
+  display: flex;
+  justify-content: space-around;
   gap: 8px;
+}
+
+.knob-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.knob {
+  width: 64px;
+  height: 64px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.knob:active { cursor: grabbing; }
+
+.knob-value {
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Morph column */
+.morph-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding-top: 8px;
+}
+
+.morph-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 200px;
+}
+
+.morph-track {
+  position: relative;
+  width: 20px;
+  height: 180px;
+  background: linear-gradient(to top, 
+    rgba(245, 158, 11, 0.15), 
+    rgba(100, 100, 100, 0.1),
+    rgba(6, 182, 212, 0.15));
+  border-radius: 10px;
+  border: 1px solid rgba(100, 100, 100, 0.2);
+}
+
+.morph-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  background: linear-gradient(to top, var(--accent-day), var(--accent-night));
+  border-radius: 10px;
+  transition: height 0.1s ease;
+}
+
+.morph-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #555, #333);
+  border: 2px solid #666;
+  border-radius: 50%;
+  bottom: 0%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  cursor: grab;
+  touch-action: none;
+}
+.morph-thumb:active { cursor: grabbing; }
+
+.morph-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 180px;
+  margin-left: 8px;
+}
+
+.morph-label {
+  font-size: 0.55rem;
+  color: var(--muted);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.1em;
+}
+.morph-label.day-label { color: var(--accent-day); }
+.morph-label.night-label { color: var(--accent-night); }
+
+/* Pitch wheel */
+.pitch-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.pitch-group label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.pitch-wheel-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.pitch-wheel {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 30% 30%, #4a4a4a, #1a1a1a),
+    conic-gradient(from 0deg, 
+      #222 0deg 30deg, 
+      #3a3a3a 30deg 60deg,
+      #222 60deg 90deg,
+      #3a3a3a 90deg 120deg,
+      #222 120deg 150deg,
+      #3a3a3a 150deg 180deg,
+      #222 180deg 210deg,
+      #3a3a3a 210deg 240deg,
+      #222 240deg 270deg,
+      #3a3a3a 270deg 300deg,
+      #222 300deg 330deg,
+      #3a3a3a 330deg 360deg);
+  border: 2px solid #444;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pitch-wheel:active { cursor: grabbing; }
+
+.pitch-wheel-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 30% 30%, #666, #333);
+  border-radius: 50%;
+  border: 1px solid #555;
+}
+
+.pitch-value {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Presets */
+.preset-section {
+  padding: 10px;
+}
+
+.preset-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.preset-button {
+  padding: 8px 14px;
+  font-size: 0.7rem;
+  color: var(--text);
+  background: rgba(100, 100, 100, 0.15);
+  border: 1px solid rgba(100, 100, 100, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.preset-button:hover {
+  background: rgba(100, 100, 100, 0.25);
+}
+.preset-button.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+/* Note */
+.note-card {
+  border-color: rgba(245, 158, 11, 0.2);
+  text-align: center;
+}
+.note-card p {
+  margin: 0;
+  font-size: 0.75rem;
   color: var(--muted);
 }
-.control strong { color: var(--text); }
-input[type='range'] {
-  width: 100%;
-  accent-color: var(--accent);
-}
-select {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid var(--card-border);
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--text);
-  padding: 12px;
-}
-.note-card { border-color: rgba(250, 204, 21, 0.25); }
-@media (min-width: 720px) {
-  .app-shell { padding-left: 24px; padding-right: 24px; }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .controls-grid {
+    grid-template-columns: 1fr;
+  }
+  .morph-column {
+    flex-direction: row;
+    justify-content: center;
+    padding-top: 0;
+  }
+  .morph-group {
+    flex-direction: row;
+    height: auto;
+    width: 200px;
+  }
+  .morph-track {
+    width: 160px;
+    height: 20px;
+  }
+  .morph-fill {
+    left: 0;
+    bottom: 0;
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(to right, var(--accent-day), var(--accent-night));
+  }
+  .morph-thumb {
+    bottom: auto;
+    left: 0%;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .morph-labels {
+    flex-direction: row;
+    width: 160px;
+    height: auto;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+  .morph-label {
+    writing-mode: horizontal-tb;
+  }
 }

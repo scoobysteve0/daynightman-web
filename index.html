@@ -4,118 +4,149 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1020" />
-    <title>DayNightMan Web Test Harness</title>
+    <title>DayNightMan</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="hero">
         <p class="eyebrow">DayNightMan</p>
-        <h1>mobile playable prototype</h1>
+        <h1>modular morph</h1>
         <p class="subcopy">
-          A phone-friendly Day / Night Man browser instrument for quick listening tests.
-          This follows the current plugin vibe and controls without pretending the app is locked yet.
+          A tactile browser instrument. Drag knobs to shape sound.
         </p>
       </header>
 
       <section class="card primary-card">
-        <button id="startButton" class="start-button">Tap to start audio</button>
-        <p id="statusText" class="status">Audio is stopped.</p>
-        <div class="pill-row">
-          <span class="pill">iPhone-friendly</span>
-          <span class="pill">shareable state</span>
-          <span class="pill">day / night switch</span>
+        <button id="startButton" class="start-button">Tap to start</button>
+        <p id="statusText" class="status">Audio stopped</p>
+      </section>
+
+      <section class="card controls-grid">
+        <!-- Left column: Parameter knobs -->
+        <div class="knob-column">
+          <div class="knob-row">
+            <div class="knob-group" data-param="bite">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="bite">
+                <defs>
+                  <linearGradient id="knob-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#4a4a4a"/>
+                    <stop offset="30%" stop-color="#2a2a2a"/>
+                    <stop offset="70%" stop-color="#1a1a1a"/>
+                    <stop offset="100%" stop-color="#3a3a3a"/>
+                  </linearGradient>
+                  <linearGradient id="knob-indicator" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#8b5cf6"/>
+                    <stop offset="100%" stop-color="#6366f1"/>
+                  </linearGradient>
+                </defs>
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">BITE</text>
+              </svg>
+              <span class="knob-value" id="biteValue">62%</span>
+            </div>
+            <div class="knob-group" data-param="heat">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="heat">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">HEAT</text>
+              </svg>
+              <span class="knob-value" id="heatValue">58%</span>
+            </div>
+            <div class="knob-group" data-param="edge">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="edge">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">EDGE</text>
+              </svg>
+              <span class="knob-value" id="edgeValue">45%</span>
+            </div>
+          </div>
+          <div class="knob-row">
+            <div class="knob-group" data-param="pulse">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="pulse">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">PULSE</text>
+              </svg>
+              <span class="knob-value" id="pulseValue">40%</span>
+            </div>
+            <div class="knob-group" data-param="haze">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="haze">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">HAZE</text>
+              </svg>
+              <span class="knob-value" id="hazeValue">48%</span>
+            </div>
+            <div class="knob-group" data-param="drift">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="drift">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">DRIFT</text>
+              </svg>
+              <span class="knob-value" id="driftValue">36%</span>
+            </div>
+          </div>
+          <div class="knob-row">
+            <div class="knob-group" data-param="space">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="space">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">SPACE</text>
+              </svg>
+              <span class="knob-value" id="spaceValue">28%</span>
+            </div>
+            <div class="knob-group" data-param="output">
+              <svg class="knob" viewBox="0 0 80 80" data-knob="output">
+                <circle cx="40" cy="40" r="36" fill="url(#knob-metal)" stroke="#222" stroke-width="2"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#111" stroke-width="1"/>
+                <line class="knob-line" x1="40" y1="40" x2="40" y2="14" stroke="url(#knob-indicator)" stroke-width="3" stroke-linecap="round"/>
+                <text x="40" y="68" text-anchor="middle" fill="#888" font-size="10">OUT</text>
+              </svg>
+              <span class="knob-value" id="outputValue">-9dB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column: Morph knob + pitch wheel -->
+        <div class="morph-column">
+          <div class="morph-group">
+            <div class="morph-track">
+              <div class="morph-fill" id="morphFill"></div>
+              <div class="morph-thumb" id="morphThumb"></div>
+            </div>
+            <div class="morph-labels">
+              <span class="morph-label day-label">DAY</span>
+              <span class="morph-label night-label">NIGHT</span>
+            </div>
+          </div>
+          <div class="pitch-group">
+            <label>Pitch Wheel</label>
+            <div class="pitch-wheel-container">
+              <div class="pitch-wheel" id="pitchWheel">
+                <div class="pitch-wheel-inner"></div>
+              </div>
+              <span class="pitch-value" id="pitchValue">0</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="card">
-        <div class="section-title-row">
-          <h2>Performance</h2>
-          <button id="copyLinkButton" class="secondary-button">Copy share link</button>
-        </div>
-        <div class="grid two-up">
-          <label class="control toggle-control">
-            <span>Power</span>
-            <button id="powerButton" class="secondary-button">Off</button>
-          </label>
-          <label class="control toggle-control">
-            <span>Mode</span>
-            <button id="modeButton" class="secondary-button">Dayman</button>
-          </label>
-          <label class="control toggle-control">
-            <span>Shade</span>
-            <button id="shadeButton" class="secondary-button">Hold</button>
-          </label>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-title-row">
-          <h2>Controls</h2>
-        </div>
-        <div class="grid">
-          <label class="control">
-            <span>Pitch</span>
-            <input id="pitch" type="range" min="-24" max="24" step="1" />
-            <strong id="pitchValue"></strong>
-          </label>
-          <label class="control">
-            <span>Bite</span>
-            <input id="bite" type="range" min="0" max="100" step="1" />
-            <strong id="biteValue"></strong>
-          </label>
-          <label class="control">
-            <span>Heat</span>
-            <input id="heat" type="range" min="0" max="100" step="1" />
-            <strong id="heatValue"></strong>
-          </label>
-          <label class="control">
-            <span>Edge</span>
-            <input id="edge" type="range" min="0" max="100" step="1" />
-            <strong id="edgeValue"></strong>
-          </label>
-          <label class="control">
-            <span>Pulse</span>
-            <input id="pulse" type="range" min="0" max="100" step="1" />
-            <strong id="pulseValue"></strong>
-          </label>
-          <label class="control">
-            <span>Haze</span>
-            <input id="haze" type="range" min="0" max="100" step="1" />
-            <strong id="hazeValue"></strong>
-          </label>
-          <label class="control">
-            <span>Drift</span>
-            <input id="drift" type="range" min="0" max="100" step="1" />
-            <strong id="driftValue"></strong>
-          </label>
-          <label class="control">
-            <span>Space</span>
-            <input id="space" type="range" min="0" max="100" step="1" />
-            <strong id="spaceValue"></strong>
-          </label>
-          <label class="control">
-            <span>Output</span>
-            <input id="output" type="range" min="-24" max="0" step="1" />
-            <strong id="outputValue"></strong>
-          </label>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="section-title-row">
-          <h2>Presets</h2>
-        </div>
+      <section class="card preset-section">
         <div class="preset-list" id="presetList"></div>
       </section>
 
       <section class="card note-card">
-        <h2>Scope note</h2>
-        <p>
-          This browser build is meant to be a flexible public listening/test harness while the real
-          plugin still evolves. It follows the current DayNightMan signal idea and control language,
-          but it is intentionally easier to retune than a strict frozen parity port.
-        </p>
+        <p>Drag knobs to shape. Right slider morphs Day ↔ Night.</p>
       </section>
     </main>
 
