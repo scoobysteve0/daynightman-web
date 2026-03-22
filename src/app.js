@@ -27,6 +27,7 @@ let audioInitPromise = null;
 let boundVisibilityRecovery = false;
 let eventsBound = false;
 let kickFlashTimeout = null;
+let morphUpdateFrame = 0;
 
 const params = ['bite', 'heat', 'edge', 'pulse', 'haze', 'drift', 'space', 'output'];
 const valueRanges = {
@@ -52,8 +53,7 @@ const els = {
   morphMode: document.getElementById('morphMode'),
   pitchWheel: document.getElementById('pitchWheel'),
   pitchValue: document.getElementById('pitchValue'),
-  kickButton: document.getElementById('kickButton'),
-  stillChips: Array.from(document.querySelectorAll('[data-scene-target]'))
+  kickButton: document.getElementById('kickButton')
 };
 
 const inputSensitivity = {
@@ -240,6 +240,7 @@ function bindEvents() {
     if (!active || active.pointerId !== event.pointerId) return;
     event.preventDefault();
     setMorphFromPointer(event);
+    queueMorphPreviewUpdate();
     renderStatus();
   });
 
@@ -301,6 +302,13 @@ function bindEvents() {
   const kickHandler = async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    if (event.type === 'click' && els.kickButton.dataset.pointerKick === '1') {
+      els.kickButton.dataset.pointerKick = '0';
+      return;
+    }
+    if (event.type === 'pointerdown') {
+      els.kickButton.dataset.pointerKick = '1';
+    }
     triggerHaptic('medium');
 
     if (!audioInitialized) {
@@ -332,16 +340,7 @@ function bindEvents() {
   };
 
   els.kickButton.addEventListener('click', kickHandler, { passive: false });
-
-  els.stillChips.forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      const target = clamp(Number(chip.dataset.sceneTarget || 0), 0, 1);
-      state.morph = target;
-      state.preset = 'Custom';
-      updateMorphUI();
-      await updateEngineFromGesture();
-    });
-  });
+  els.kickButton.addEventListener('pointerdown', kickHandler, { passive: false });
 }
 
 
@@ -450,6 +449,21 @@ function setMorphFromPointer(event) {
   updateMorphUI();
 }
 
+function queueMorphPreviewUpdate() {
+  if (morphUpdateFrame) return;
+  morphUpdateFrame = window.requestAnimationFrame(async () => {
+    morphUpdateFrame = 0;
+    saveState();
+    if (!audioInitialized || !engine) return;
+    const running = await recoverAudioContext('gesture');
+    if (!running) {
+      render();
+      return;
+    }
+    engine.update(state);
+  });
+}
+
 function updateMorphUI() {
   const morph = state.morph;
   const horizontal = window.matchMedia('(max-width: 560px)').matches;
@@ -506,18 +520,7 @@ function updateMorphUI() {
 
   const modeName = morph < 0.22 ? 'DAY' : morph > 0.78 ? 'NIGHT' : 'TWILIGHT';
   els.morphMode.textContent = modeName;
-  syncStillChips(morph);
   renderStatus();
-}
-
-function syncStillChips(morph) {
-  let activeIndex = 1;
-  if (morph < 0.22) activeIndex = 0;
-  else if (morph > 0.78) activeIndex = 2;
-
-  els.stillChips.forEach((chip, index) => {
-    chip.classList.toggle('active', index === activeIndex);
-  });
 }
 
 function updatePitchUI() {

@@ -195,55 +195,6 @@ h1 {
   margin: 10px 0 0;
 }
 
-.reference-card {
-  display: grid;
-  gap: 14px;
-}
-
-.reference-copy h2 {
-  margin: 0;
-  font-size: clamp(1.05rem, 3.5vw, 1.45rem);
-  letter-spacing: 0.04em;
-}
-
-.reference-copy p:last-child {
-  margin: 10px 0 0;
-  color: var(--muted);
-  line-height: 1.55;
-  font-size: 0.82rem;
-}
-
-.reference-stills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.still-chip {
-  appearance: none;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.06);
-  color: var(--text);
-  border-radius: 999px;
-  padding: 10px 14px;
-  font: inherit;
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
-}
-
-.still-chip:hover,
-.still-chip.active {
-  background: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.18);
-  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.5);
-}
-
-.still-chip:active {
-  transform: translateY(1px);
-}
-
 .synth-object {
   padding: 18px 14px 20px;
   overflow: visible;
@@ -258,19 +209,22 @@ h1 {
   pointer-events: none;
   background-size: cover;
   background-position: center;
-  mix-blend-mode: screen;
-  filter: saturate(1.05) contrast(1.02);
+  opacity: 0;
 }
 
 .synth-object::before {
   background-image: url('./art/renders/daynightman_day.png'), url('./art/renders/daynightman_twilight.png');
   background-blend-mode: normal;
-  opacity: calc(var(--scene-day-opacity) * 0.34 + var(--scene-twilight-opacity) * 0.24);
+  mix-blend-mode: screen;
+  filter: saturate(1.04) contrast(1.02);
+  opacity: calc(var(--scene-day-opacity) * 0.14 + var(--scene-twilight-opacity) * 0.12);
 }
 
 .synth-object::after {
   background-image: url('./art/renders/daynightman_night.png');
-  opacity: calc(var(--scene-night-opacity) * 0.34);
+  mix-blend-mode: lighten;
+  filter: saturate(1.08) contrast(1.04);
+  opacity: calc(var(--scene-night-opacity) * 0.14);
 }
 
 .desk-shadow {
@@ -796,51 +750,8 @@ h1 {
   line-height: 1.5;
 }
 
-
-.motion-card {
-  border-color: rgba(var(--accent-r), var(--accent-g), var(--accent-b), 0.24);
-}
-
-.motion-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.motion-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 16px;
-  background: rgba(0,0,0,0.18);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.motion-video {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: 12px;
-  background: #050608;
-}
-
-.motion-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.motion-meta strong {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.motion-meta span {
-  font-size: 0.72rem;
-  color: var(--muted);
-  line-height: 1.45;
+.note-card strong {
+  color: var(--text);
 }
 
 @media (max-width: 680px) {
@@ -854,10 +765,6 @@ h1 {
 
   .space-well {
     order: 3;
-  }
-
-  .motion-grid {
-    grid-template-columns: 1fr;
   }
 }
 
